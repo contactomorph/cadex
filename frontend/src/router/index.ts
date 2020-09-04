@@ -2,6 +2,8 @@ import Vue from 'vue'
 import VueRouter, { RouteConfig } from 'vue-router'
 import Home from '../views/Home.vue'
 import Firebase from '../views/FirebaseExample.vue'
+import Story from '../views/Story.vue'
+
 Vue.use(VueRouter)
 
   const routes: Array<RouteConfig> = [
@@ -22,6 +24,11 @@ Vue.use(VueRouter)
     path: '/firebase',
     name: 'Firebase',
     component: Firebase
+  },
+    {
+    path: '/story',
+    name: 'Story',
+    component: Story
   }
 ]
 

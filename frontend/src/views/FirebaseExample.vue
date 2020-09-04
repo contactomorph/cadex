@@ -16,8 +16,8 @@ import 'firebase/database'
 const FirebaseModule = Vue.extend({
   data () {
     return {
-      aword: null,
-      word: null
+      aword: '',
+      word: ''
     }
   },
   methods: {
@@ -26,7 +26,7 @@ const FirebaseModule = Vue.extend({
         const words = Object.keys(snapshot.val())
         const i = Math.floor(Math.random() * words.length)
         this.aword = words[i]
-      });
+      })
     },
     send () {
       firebase.database().ref('/words/'+this.word).set(true).then(() => {
