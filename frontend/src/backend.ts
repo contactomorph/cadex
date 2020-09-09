@@ -1,4 +1,5 @@
 import * as firebase from 'firebase/app'
+import 'firebase/database'
 import { v4 as uuid } from 'uuid'
 
 const firebaseConfig = {
@@ -18,6 +19,33 @@ function initialize() {
 
 let story: Story
 
+class DBObject {
+  readonly id: string
+  readonly parent: DBObject | null
+  readonly db = firebase.database()
+  readonly refname: string
+
+  constructor(refname: string, parent: DBObject|null, id?: string) {
+    this.parent = parent
+    this.refname = refname
+    if(id) {
+      this.id = id
+    } else {
+      this.id = uuid()
+    }
+  }
+
+  protected ref(): Reference {
+    let base: Reference
+    if(this.parent) {
+      base = this.parent.ref()
+    } else {
+      base = this.db.ref('/'+this.refname)
+    }
+    return base.child(this.id)
+  }
+}
+
 class Chunk {
   head = ''
   tail = ''
@@ -33,8 +61,9 @@ class Chunk {
 type MyTurn = ((player: Player, tail: string) => void) | null
 type NewTurn = ((player: Player) => void) | null
 type TheEnd = ((chunks: Array<Chunk>) => void) | null
+type Reference = firebase.database.Reference
 
-class Player {
+class Player extends DBObject {
   readonly id: string
   public name: string
   public played = false
@@ -45,7 +74,8 @@ class Player {
   head = ''
   tail = ''
 
-  constructor(name: string, story: Story) {
+  constructor(name: string, story: Story, id?: string) {
+    super('players', story, id)
     this.id = uuid()
     this.name = name
     this.story = story
@@ -67,6 +97,7 @@ class Player {
       this.myTurnCallback(this, tail)
     }
   }
+
 }
 
 enum StoryState {
@@ -77,22 +108,23 @@ enum StoryState {
 }
 
 
-class Story {
+class Story extends DBObject {
   /* Public attributes */
-  readonly id: string
   players: Array<Player> = []
   playerNumber = 0
   state = StoryState.Starting
+  lastSaveTS = 0
 
   /* Private attributes */
   private newTurnCallback: NewTurn = null
   private theEndCallback: TheEnd = null
 
   /* Constructor */
-  constructor(players: number) {
-    this.id = uuid()
+  constructor(players: number, id?: string) {
+    super('stories', null, id)
     this.playerNumber = players
     this.state = StoryState.Registering
+    this.save()
   }
 
   /* Public methods */
@@ -120,8 +152,6 @@ class Story {
     return "http://localhost/"+this.id
   }
 
-  /* Private methods */
-
   public turn(): void {
     if(this.state!==StoryState.Writting) {
       throw "Story is not ready to progress"
@@ -145,6 +175,25 @@ class Story {
       }
       this.theEndCallback(chunks)
     }
+  }
+
+  /* Private methods */
+  private save(): void {
+    this.ref().set({
+      playerNumber: this.playerNumber,
+      state: this.state,
+
+    }).then(() => {
+      this.lastSaveTS = Date.now()
+    });
+  }
+
+  private load(uid: string) {
+    this.ref().once('value').then((snapshot) => {
+      const mystoryData = snapshot.val()
+      const mystory = new Story(mystoryData.playerNumber, uid)
+      mystory.state = mystoryData.state
+    })
   }
 
   private start(): void {
