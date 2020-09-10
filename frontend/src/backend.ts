@@ -38,6 +38,7 @@ abstract class DBObject {
     } else {
       this.id = uuid()
     }
+    this.registerListener()
   }
 
   protected ref(): Reference {
@@ -54,22 +55,19 @@ abstract class DBObject {
   protected abstract serialize(): object
   protected abstract update(data: object): void
 
-  public load(): void {
-    this.ref().once('value').then((snapshot) => {
+  private registerListener(): void {
+    this.ref().on('value', (snapshot) => {
       const data = snapshot.val()
-      this.update(data)
-
-      for(const child of this.childs) {
-        child.load()
+      if(data) {
+        this.update(data)
       }
     })
   }
 
   public save(): void {
     const data = this.serialize()
-    this.ref().set(data).then(() => {
+    this.ref().update(data).then(() => {
       this.lastSaveTS = Date.now()
-
       for(const child of this.childs) {
         child.save()
       }
@@ -89,32 +87,35 @@ class Chunk {
   }
 }
 
-type MyTurn = ((player: Player, tail: string) => void) | null
-type NewTurn = ((player: Player) => void) | null
-type TheEnd = ((chunks: Array<Chunk>) => void) | null
+type MyTurnFunction = ((player: Player, tail: string) => void) | null
+type TurnFunction = ((player: Player) => void) | null
+type TheEndFunction = ((chunks: Array<Chunk>) => void) | null
 type Reference = firebase.database.Reference
 
 interface PlayerData {
   name: string;
+  myturn: boolean;
   played: boolean;
   head: string;
   tail: string;
+  ptail: string;
 }
 
 class Player extends DBObject {
   readonly id: string
   public name: string
   public played = false
+  public myturn = false
   story: Story
-  myTurnCallback: MyTurn = null
+  myTurnCallback: MyTurnFunction = null
 
   /* just for debug */
+  ptail = ''
   head = ''
   tail = ''
 
   constructor(name: string, story: Story, id?: string) {
     super('players', story, id)
-    this.id = uuid()
     this.name = name
     this.story = story
   }
@@ -123,25 +124,28 @@ class Player extends DBObject {
     this.head = head
     this.tail = tail
     this.played = true
+    this.myturn = false
     this.story.turn()
   }
 
-  setMyTurnCallback(callback: MyTurn) {
+  setMyTurnCallback(callback: MyTurnFunction) {
     this.myTurnCallback = callback
   }
 
   myTurn(tail: string) {
-    if(this.myTurnCallback) {
-      this.myTurnCallback(this, tail)
-    }
+    this.ptail = tail
+    this.myturn = true
+    this.save()
   }
 
   protected serialize(): PlayerData {
     return {
       name: this.name,
+      myturn: this.myturn,
       played: this.played,
       head: this.head,
       tail: this.tail,
+      ptail: this.ptail,
     }
   }
 
@@ -150,6 +154,11 @@ class Player extends DBObject {
     this.played = data.played
     this.head = data.head
     this.tail = data.tail
+    this.myturn = data.myturn
+    this.ptail = data.ptail
+    if(this.myturn && this.myTurnCallback) {
+      this.myTurnCallback(this, this.ptail)
+    }
   }
 
 }
@@ -174,8 +183,8 @@ class Story extends DBObject {
   lastSaveTS = 0
 
   /* Private attributes */
-  private newTurnCallback: NewTurn = null
-  private theEndCallback: TheEnd = null
+  private turnCallback: TurnFunction = null
+  private theEndCallback: TheEndFunction = null
 
   /* Constructor */
   constructor(players: number, id?: string) {
@@ -195,14 +204,15 @@ class Story extends DBObject {
     if(this.players.length == this.playerNumber) {
       this.start()
     }
+    this.save()
     return player
   }
 
-  setNewTurnCallback(callback: NewTurn) {
-    this.newTurnCallback = callback
+  setTurnCallback(callback: TurnFunction) {
+    this.turnCallback = callback
   }
 
-  setTheEndCallback(callback: TheEnd) {
+  setTheEndCallback(callback: TheEndFunction) {
     this.theEndCallback = callback
   }
 
@@ -217,15 +227,18 @@ class Story extends DBObject {
     let tail = ''
     for(const player of this.players) {
       if(!player.played) {
-        if(this.newTurnCallback) {
-          this.newTurnCallback(player)
+        if(this.turnCallback) {
+          this.turnCallback(player)
         }
         player.myTurn(tail)
+        this.save()
         return
       } else {
         tail = player.tail
       }
     }
+    this.state = StoryState.End
+    this.save()
     if(this.theEndCallback) {
       const chunks: Array<Chunk> = []
       for(const player of this.players) {
@@ -255,8 +268,6 @@ class Story extends DBObject {
       this.turn()
     }, 1000)
   }
-
-
 }
 
 function startStory(players: number) {

@@ -30,7 +30,7 @@ const StoryModule = Vue.extend({
         me.play("my head", "my tail")
       }
 
-      function newTurn(player: Player) {
+      function turn(player: Player) {
         // When a new turn start
         console.log("Turn of the player "+player.name)
       }
@@ -43,7 +43,7 @@ const StoryModule = Vue.extend({
       }
 
       me.setMyTurnCallback(myAI)
-      story.setNewTurnCallback(newTurn)
+      story.setTurnCallback(turn)
       story.setTheEndCallback(theEnd)
 
       simulPlayer("john", 2000)
