@@ -3,10 +3,10 @@ import VueRouter, { RouteConfig } from 'vue-router'
 import Home from '../views/Home.vue'
 import Firebase from '../views/FirebaseExample.vue'
 import Story from '../views/Story.vue'
-
+import Firebase2 from '../views/FirebaseExample2.vue'
 Vue.use(VueRouter)
 
-  const routes: Array<RouteConfig> = [
+const routes: Array<RouteConfig> = [
   {
     path: '/',
     name: 'Home',
@@ -25,11 +25,16 @@ Vue.use(VueRouter)
     name: 'Firebase',
     component: Firebase
   },
-    {
+  {
     path: '/story',
     name: 'Story',
     component: Story
-  }
+  },
+  {
+    path: '/firebase2',
+    name: 'Firebase2',
+    component: Firebase2
+  },
 ]
 
 const router = new VueRouter({
