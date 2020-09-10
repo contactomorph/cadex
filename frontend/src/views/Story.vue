@@ -1,54 +1,97 @@
 <template>
   <div>
     <h1>Coucou</h1>
-    <button @click="scenario">Run</button>
+    <div>
+      <button @click="scenario">Run</button>
+      <span>Id: </span>
+      <span> {{ storyUrl }} </span>
+    </div>
+    <div>{{ previous }}</div>
+    <div>{{ message  }}</div>
+    <div>
+      <span>{{ previous }}</span>
+      <input v-model="head" type="text" placeholder="la suite">
+      <input v-model="tail" type="text" placeholder="la fin">
+      <button @click="post">Play</button>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
-import { Player, Chunk, startStory, simulPlayer } from '../backend'
+import { Story, Player, Chunk } from '../backend'
 
+
+/* Simulate the game */
+
+function AI(me: Player, tail: string) {
+  me.play("("+tail+")" + me.name + " head", me.name + " tail")
+}
+
+function simulPlayer(story: Story, name: string, add: number) {
+  setTimeout(function() {
+    const player = story.addPlayer(name)
+    player.setMyTurnCallback(AI)
+  }, add)
+}
+
+let me: Player|null = null
 
 const StoryModule = Vue.extend({
-
+  data() {
+    return {
+      previous: "",
+      message: "No story",
+      head: "",
+      tail: "",
+      storyUrl: "",
+    }
+  },
   methods: {
-
+    post() {
+      if(me) {
+        me.play(this.head, this.tail)
+      }
+    },
     scenario () {
       // Create a new story with 4 players
-      const story = startStory(4)
-
-      // Add a new player
-      const me = story.addPlayer("aurelien")
+      this.message = "Let's start a new story"
+      const story = new Story()
+      story.startRegistration(4)
+      this.storyUrl = story.url
 
       // Get the url to share with others
       console.log(story.url)
 
+      // Add a new player
+      me = story.addPlayer("aurelien")
+
       // Create a listener for my turn
-      function myAI(me: Player, tail: string) {
-        console.log("I receive <"+tail+">")
-        me.play("my head", "my tail")
+      const myTurn = (me: Player, tail: string) => {
+        this.message = "This is my turn !!!"
+        this.previous = tail
       }
 
-      function turn(player: Player) {
+      const turn = (player: Player) => {
         // When a new turn start
         console.log("Turn of the player "+player.name)
       }
 
-      function theEnd(chunks: Array<Chunk>) {
+      const theEnd = (chunks: Array<Chunk>) => {
         /* reveal the complete story */
+        this.message = "The story is over"
         for(const chunk of chunks) {
           console.log(chunk.player.name + ":" + chunk.head + " " + chunk.tail)
         }
       }
 
-      me.setMyTurnCallback(myAI)
+      me.setMyTurnCallback(myTurn)
       story.setTurnCallback(turn)
       story.setTheEndCallback(theEnd)
 
-      simulPlayer("john", 2000)
-      simulPlayer("bill", 3000)
-      simulPlayer("mike", 4000)
+      simulPlayer(story, "john", 2000)
+      simulPlayer(story, "bill", 3000)
+      simulPlayer(story, "mike", 4000)
 
 
     }

@@ -17,8 +17,6 @@ function initialize() {
   firebase.initializeApp(firebaseConfig)
 }
 
-let story: Story
-
 abstract class DBObject {
   readonly id: string
   readonly parent: DBObject | null
@@ -28,6 +26,7 @@ abstract class DBObject {
   lastSaveTS = 0
 
   constructor(refname: string, parent: DBObject|null, id?: string) {
+    console.log(this)
     this.parent = parent
     if(this.parent) {
       this.parent.childs.push(this)
@@ -35,6 +34,7 @@ abstract class DBObject {
     this.refname = refname
     if(id) {
       this.id = id
+      this.load()
     } else {
       this.id = uuid()
     }
@@ -55,13 +55,19 @@ abstract class DBObject {
   protected abstract serialize(): object
   protected abstract update(data: object): void
 
+  private __update(snapshot: Snapshot): void {
+    const data = snapshot.val()
+    if(data) {
+      this.update(data)
+    }
+  }
+
+  protected load(): void {
+    this.ref().once('value', (x) => this.__update(x))
+  }
+
   private registerListener(): void {
-    this.ref().on('value', (snapshot) => {
-      const data = snapshot.val()
-      if(data) {
-        this.update(data)
-      }
-    })
+    this.ref().on('value', (x) => this.__update(x))
   }
 
   public save(): void {
@@ -91,6 +97,7 @@ type MyTurnFunction = ((player: Player, tail: string) => void) | null
 type TurnFunction = ((player: Player) => void) | null
 type TheEndFunction = ((chunks: Array<Chunk>) => void) | null
 type Reference = firebase.database.Reference
+type Snapshot = firebase.database.DataSnapshot
 
 interface PlayerData {
   name: string;
@@ -102,7 +109,6 @@ interface PlayerData {
 }
 
 class Player extends DBObject {
-  readonly id: string
   public name: string
   public played = false
   public myturn = false
@@ -120,7 +126,7 @@ class Player extends DBObject {
     this.story = story
   }
 
-  play(head: string, tail: string) {
+  public play(head: string, tail: string) {
     this.head = head
     this.tail = tail
     this.played = true
@@ -130,6 +136,7 @@ class Player extends DBObject {
 
   setMyTurnCallback(callback: MyTurnFunction) {
     this.myTurnCallback = callback
+    this.load() // Force to trigger the callback if it is my turn
   }
 
   myTurn(tail: string) {
@@ -186,16 +193,29 @@ class Story extends DBObject {
   private turnCallback: TurnFunction = null
   private theEndCallback: TheEndFunction = null
 
+  /* Static */
+  static join(id: string, myname: string): [Story, Player] {
+    const story = new Story(id)
+    const player = story.addPlayer(myname)
+    return [story, player]
+  }
+
   /* Constructor */
-  constructor(players: number, id?: string) {
+  constructor(id?: string) {
     super('stories', null, id)
-    this.playerNumber = players
-    this.state = StoryState.Registering
-    this.save()
   }
 
   /* Public methods */
-  addPlayer(name: string) {
+  public startRegistration(players: number): void {
+    if(this.state !== StoryState.Starting) {
+      throw "The story is not in this initial state"
+    }
+    this.state = StoryState.Registering
+    this.playerNumber = players
+    this.save()
+  }
+
+  public addPlayer(name: string) {
     if(this.state!==StoryState.Registering) {
       throw "Story is not ready to add player"
     }
@@ -208,6 +228,14 @@ class Story extends DBObject {
     return player
   }
 
+  public start(): void {
+    this.state = StoryState.Writting
+    setTimeout(() => {
+      console.log("Start playing")
+      this.turn()
+    }, 1000)
+  }
+
   setTurnCallback(callback: TurnFunction) {
     this.turnCallback = callback
   }
@@ -217,6 +245,9 @@ class Story extends DBObject {
   }
 
   get url(): string {
+    if(this.state === StoryState.Starting) {
+      throw "You must start registration before broadcast url"
+    }
     return "http://localhost/"+this.id
   }
 
@@ -261,45 +292,11 @@ class Story extends DBObject {
     this.state = data.state
   }
 
-  private start(): void {
-    this.state = StoryState.Writting
-    setTimeout(() => {
-      console.log("Start playing")
-      this.turn()
-    }, 1000)
-  }
 }
-
-function startStory(players: number) {
-  story = new Story(players)
-  return story
-}
-
-function joinStory() {
-  throw 'Not implemented'
-}
-
-/* Simulate the game */
-
-function AI(me: Player, tail: string) {
-  me.play("("+tail+")" + me.name + " head", me.name + " tail")
-}
-
-function simulPlayer(name: string, add: number) {
-  setTimeout(function() {
-    const player = story.addPlayer(name)
-    player.setMyTurnCallback(AI)
-  }, add)
-}
-
-
 
 export {
   initialize,
-  story,
-  startStory,
-  joinStory,
+  Story as Story,
   Player as Player,
   Chunk as Chunk,
-  simulPlayer
 }
