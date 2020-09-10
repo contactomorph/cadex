@@ -19,14 +19,19 @@ function initialize() {
 
 let story: Story
 
-class DBObject {
+abstract class DBObject {
   readonly id: string
   readonly parent: DBObject | null
+  readonly childs: Array<DBObject> = []
   readonly db = firebase.database()
   readonly refname: string
+  lastSaveTS = 0
 
   constructor(refname: string, parent: DBObject|null, id?: string) {
     this.parent = parent
+    if(this.parent) {
+      this.parent.childs.push(this)
+    }
     this.refname = refname
     if(id) {
       this.id = id
@@ -40,9 +45,35 @@ class DBObject {
     if(this.parent) {
       base = this.parent.ref()
     } else {
-      base = this.db.ref('/'+this.refname)
+      base = this.db.ref()
     }
-    return base.child(this.id)
+    base = base.child(this.refname).child(this.id)
+    return base
+  }
+
+  protected abstract serialize(): object
+  protected abstract update(data: object): void
+
+  public load(): void {
+    this.ref().once('value').then((snapshot) => {
+      const data = snapshot.val()
+      this.update(data)
+
+      for(const child of this.childs) {
+        child.load()
+      }
+    })
+  }
+
+  public save(): void {
+    const data = this.serialize()
+    this.ref().set(data).then(() => {
+      this.lastSaveTS = Date.now()
+
+      for(const child of this.childs) {
+        child.save()
+      }
+    })
   }
 }
 
@@ -62,6 +93,13 @@ type MyTurn = ((player: Player, tail: string) => void) | null
 type NewTurn = ((player: Player) => void) | null
 type TheEnd = ((chunks: Array<Chunk>) => void) | null
 type Reference = firebase.database.Reference
+
+interface PlayerData {
+  name: string;
+  played: boolean;
+  head: string;
+  tail: string;
+}
 
 class Player extends DBObject {
   readonly id: string
@@ -98,6 +136,22 @@ class Player extends DBObject {
     }
   }
 
+  protected serialize(): PlayerData {
+    return {
+      name: this.name,
+      played: this.played,
+      head: this.head,
+      tail: this.tail,
+    }
+  }
+
+  protected update(data: PlayerData): void {
+    this.name = data.name
+    this.played = data.played
+    this.head = data.head
+    this.tail = data.tail
+  }
+
 }
 
 enum StoryState {
@@ -107,6 +161,10 @@ enum StoryState {
   End
 }
 
+interface StoryData {
+  playerNumber: number;
+  state: StoryState;
+}
 
 class Story extends DBObject {
   /* Public attributes */
@@ -177,23 +235,17 @@ class Story extends DBObject {
     }
   }
 
-  /* Private methods */
-  private save(): void {
-    this.ref().set({
+  /* Protected methods */
+  protected serialize(): StoryData {
+    return {
       playerNumber: this.playerNumber,
       state: this.state,
-
-    }).then(() => {
-      this.lastSaveTS = Date.now()
-    });
+    }
   }
 
-  private load(uid: string) {
-    this.ref().once('value').then((snapshot) => {
-      const mystoryData = snapshot.val()
-      const mystory = new Story(mystoryData.playerNumber, uid)
-      mystory.state = mystoryData.state
-    })
+  protected update(data: StoryData): void {
+    this.playerNumber = data.playerNumber
+    this.state = data.state
   }
 
   private start(): void {
@@ -203,6 +255,7 @@ class Story extends DBObject {
       this.turn()
     }, 1000)
   }
+
 
 }
 
