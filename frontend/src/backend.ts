@@ -70,7 +70,7 @@ abstract class DBObject {
   readonly childs: ChildReferences = {}
   readonly db = firebase.database()
   readonly data: DBObjectData = {}
-  updateCallback: UpdateFunction = null
+  readonly updateCallbacks: Array<UpdateFunction> = []
 
   private childTypes: Map<string, string> = new Map()
   private sign = ''
@@ -168,8 +168,8 @@ abstract class DBObject {
 
   private __fullUpdate(snapshot: Snapshot): void {
     this.__update(snapshot).then(() => {
-      if (this.updateCallback) {
-        this.updateCallback(this)
+      for (const callback of this.updateCallbacks) {
+        callback(this)
       }
       this.updated()
     })
@@ -180,8 +180,11 @@ abstract class DBObject {
     return this
   }
 
-  public setUpdateCallback(callback: UpdateFunction): void {
-    this.updateCallback = callback
+  public addUpdateCallback(callback: UpdateFunction, notfirst?: boolean): void {
+    this.updateCallbacks.push(callback)
+    if (callback && !notfirst) {
+      callback(this)
+    }
   }
 
   protected updated(): void {
@@ -220,10 +223,11 @@ class Chunk {
   }
 }
 
-type UpdateFunction = ((obj: DBObject) => void) | null
-type MyTurnFunction = ((player: Player, tail: string) => void) | null
-type TurnFunction = ((player: Player) => void) | null
-type TheEndFunction = ((chunks: Array<Chunk>) => void) | null
+type UpdateFunction = ((obj: DBObject) => void)
+type MyTurnFunction = ((player: Player, tail: string) => void)
+type TurnFunction = ((player: Player) => void)
+type TheEndFunction = ((chunks: Array<Chunk>) => void)
+
 type Reference = firebase.database.Reference
 type Snapshot = firebase.database.DataSnapshot
 
@@ -238,7 +242,7 @@ interface PlayerData extends DBObjectData {
 
 class Player extends DBObject {
   story: Story
-  myTurnCallback: MyTurnFunction = null
+  myTurnCallbacks: Array<MyTurnFunction> = []
 
   /* just for debug */
   ptail = ''
@@ -259,9 +263,9 @@ class Player extends DBObject {
     this.save()
   }
 
-  setMyTurnCallback(callback: MyTurnFunction) {
-    this.myTurnCallback = callback
-    if (this.data.myturn && callback) {
+  addMyTurnCallback(callback: MyTurnFunction, notfirst?: boolean) {
+    this.myTurnCallbacks.push(callback)
+    if (this.data.myturn && callback && !notfirst) {
       callback(this, this.data.ptail)
     }
   }
@@ -270,8 +274,8 @@ class Player extends DBObject {
     this.data.ptail = tail
     this.data.myturn = true
     await this.save()
-    if (this.myTurnCallback) {
-      this.myTurnCallback(this, tail)
+    for (const callback of this.myTurnCallbacks) {
+      callback(this, tail)
     }
   }
 }
@@ -293,8 +297,8 @@ interface StoryData extends DBObjectData {
 
 class Story extends DBObject {
   /* Private attributes */
-  private turnCallback: TurnFunction = null
-  private theEndCallback: TheEndFunction = null
+  private turnCallbacks: Array<TurnFunction> = []
+  private theEndCallbacks: Array<TheEndFunction> = []
 
   /* Constructor */
   constructor(id?: string) {
@@ -353,12 +357,12 @@ class Story extends DBObject {
     throw "Unknown player"
   }
 
-  setTurnCallback(callback: TurnFunction) {
-    this.turnCallback = callback
+  addTurnCallback(callback: TurnFunction) {
+    this.turnCallbacks.push(callback)
   }
 
-  setTheEndCallback(callback: TheEndFunction) {
-    this.theEndCallback = callback
+  addTheEndCallback(callback: TheEndFunction) {
+    this.theEndCallbacks.push(callback)
     if (this.data.state == StoryState.End) {
       this.commitTheEnd()
     }
@@ -378,8 +382,8 @@ class Story extends DBObject {
     let tail = ''
     for(const player of this.players) {
       if(!player.data.played) {
-        if(this.turnCallback) {
-          this.turnCallback(player)
+        for (const callback of this.turnCallbacks) {
+          callback(player)
         }
         await player.myTurn(tail)
         await this.save()
@@ -394,12 +398,12 @@ class Story extends DBObject {
   }
 
   private commitTheEnd() {
-    if(this.theEndCallback) {
-      const chunks: Array<Chunk> = []
-      for(const player of this.players) {
-        chunks.push(new Chunk(player, player.data.head, player.data.tail))
-      }
-      this.theEndCallback(chunks)
+    const chunks: Array<Chunk> = []
+    for(const player of this.players) {
+      chunks.push(new Chunk(player, player.data.head, player.data.tail))
+    }
+    for (const callback of this.theEndCallbacks) {
+      callback(chunks)
     }
   }
 
