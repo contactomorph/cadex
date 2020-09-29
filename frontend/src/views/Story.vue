@@ -1,43 +1,37 @@
 <template>
   <div>
-    <h1>Coucou</h1>
-    <div>
-      <button @click="scenario">Run</button>
-      <span>Id: </span>
-      <span> {{ storyUrl }} </span>
-    </div>
-    <div>{{ previous }}</div>
+    <h1>L'histoire</h1>
+    {{ state() }}
+    <h1>Le joueur</h1>
+    <Joiner v-on:playerSelected="addPlayerCallback"/>
     <div>{{ message  }}</div>
+
     <div>
-      <span>{{ previous }}</span>
+      Je suis <span v-if="$store.state.me">{{ $store.state.me.data.name }}</span>
+      <span v-if="previous"> et je dois continuer "{{ previous }}"</span>
+    </div>
+
+    <div>
       <input v-model="head" type="text" placeholder="la suite">
       <input v-model="tail" type="text" placeholder="la fin">
       <button @click="post">Play</button>
+    </div>
+
+    <div>
+      {{ myStory }}
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
-import { Story, Player, Chunk } from '../backend'
-
-
-/* Simulate the game */
-
-function AI(me: Player, tail: string) {
-  me.play("("+tail+")" + me.name + " head", me.name + " tail")
-}
-
-function simulPlayer(story: Story, name: string, add: number) {
-  setTimeout(function() {
-    const player = story.addPlayer(name)
-    player.setMyTurnCallback(AI)
-  }, add)
-}
-
-let me: Player|null = null
+import { StoryState, Player, Chunk } from '../backend'
+import Joiner from '@/components/Joiner.vue'
 
 const StoryModule = Vue.extend({
+  components: {
+    Joiner
+  },
   data() {
     return {
       previous: "",
@@ -45,55 +39,50 @@ const StoryModule = Vue.extend({
       head: "",
       tail: "",
       storyUrl: "",
+      myStory: ""
     }
   },
+  created () {
+    this.join()
+  },
   methods: {
-    post() {
-      if(me) {
-        me.play(this.head, this.tail)
+    state () {
+      if (!this.$store.state.story) {
+        return "En attente d'une nouvelle histoire"
       }
+      switch(this.$store.state.story.data.state) {
+        case StoryState.Starting:
+          return "Début"
+        case StoryState.Registering:
+          return "On attend les derniers joueur"
+        case StoryState.Writting:
+          return "L'histoire s'écrit"
+        case StoryState.End:
+          return "C'est la fin"
+      }
+      return "Error"
     },
-    scenario () {
-      // Create a new story with 4 players
-      this.message = "Let's start a new story"
-      const story = new Story()
-      story.startRegistration(4)
-      this.storyUrl = story.url
+    post() {
+      this.$store.state.me.play(this.head, this.tail)
+    },
+    join () {
+      this.$store.commit('joinStory', this.$route.params.storyId)
+      this.$store.state.story.load().then(() => {
+        this.$store.state.story.setTheEndCallback((chunks: Array<Chunk>) => {
+          for (const chunk of chunks) {
+            this.myStory += (chunk.head + ' ' + chunk.tail + ' ')
+          }
+        })
+      })
 
-      // Get the url to share with others
-      console.log(story.url)
-
-      // Add a new player
-      me = story.addPlayer("aurelien")
-
-      // Create a listener for my turn
+    },
+    addPlayerCallback () {
+      this.message = "This is not my turn"
       const myTurn = (me: Player, tail: string) => {
         this.message = "This is my turn !!!"
         this.previous = tail
       }
-
-      const turn = (player: Player) => {
-        // When a new turn start
-        console.log("Turn of the player "+player.name)
-      }
-
-      const theEnd = (chunks: Array<Chunk>) => {
-        /* reveal the complete story */
-        this.message = "The story is over"
-        for(const chunk of chunks) {
-          console.log(chunk.player.name + ":" + chunk.head + " " + chunk.tail)
-        }
-      }
-
-      me.setMyTurnCallback(myTurn)
-      story.setTurnCallback(turn)
-      story.setTheEndCallback(theEnd)
-
-      simulPlayer(story, "john", 2000)
-      simulPlayer(story, "bill", 3000)
-      simulPlayer(story, "mike", 4000)
-
-
+      this.$store.state.me.setMyTurnCallback(myTurn)
     }
   }
 })

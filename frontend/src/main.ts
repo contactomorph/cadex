@@ -7,11 +7,10 @@ import * as backend from './backend'
 
 Vue.config.productionTip = false
 
+backend.initialize()
+
 new Vue({
   router,
   store,
   render: h => h(App)
 }).$mount('#app')
-
-backend.initialize()
-
