@@ -1,21 +1,31 @@
 <template>
-  <table class="ex_cad_frame">
-    <tr v-for="row in getRows()" :key="row.index" :style="row.style">
-      <th style="font-style: italic">{{ row.token.authorName }}: </th>
-      <th>
-        <template v-if="!isSecret">
-          <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
-        </template>
-        <template v-else-if="row.isLast">
-          <span :style="row.fuzzyStyle">{{ row.token.beginning }}</span>&nbsp;
-          <span>{{ row.token.ending }}</span>
-        </template>
-        <template v-else>
-          <span :style="row.fuzzyStyle">{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
-        </template>
-      </th>
-    </tr>
-  </table>
+  <div class="ex_cad_frame">
+    <table class="ex_cad_table">
+      <colgroup>
+       <col span="1" style="width:100px;">
+       <col span="1">
+      </colgroup>
+      <tr v-for="row in getRows()" :key="row.index" :style="row.style">
+        <td style="font-style: italic">{{ row.token.authorName }}: </td>
+        <td>
+          <template v-if="isDisclosed()">
+            <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
+          </template>
+          <template v-else-if="row.isAlmostLast">
+            <span :style="row.fuzzyStyle">{{ row.token.beginning }}</span>&nbsp;
+            <span>{{ row.token.ending }}</span>
+          </template>
+          <template v-else-if="row.isLast">
+            <input type="text" style="width:45%; border:none; background-color:transparent" :value="row.token.beginning">&nbsp;|&nbsp;
+            <input type="text" style="width:45%; border:none; background-color:transparent" :value="row.token.ending">
+          </template>
+          <template v-else>
+            <span :style="row.fuzzyStyle">{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
+          </template>
+        </td>
+      </tr>
+    </table>
+  </div>
 </template>
 
 <style>
@@ -35,64 +45,57 @@
 
 <script lang="ts">
 import Vue from 'vue'
-//import Chroma from 'chroma-js'
+import Chroma from 'chroma-js'
+
+export enum ExCadMode { Waiting, ReadyForInput, Disclosed }
 
 export class ExCadToken {
-  beg$: string
-  ending$: string
-  name$: string
-  get beginning(): string { return this.beg$ }
-  get ending(): string { return this.ending$ }
-  get authorName(): string { return this.name$ }
+  readonly beginning: string
+  readonly ending: string
+  readonly authorName: string
   constructor(authorName: string, beginning: string, ending: string) {
-    this.beg$ = beginning
-    this.ending$ = ending
-    this.name$ = authorName
+    this.beginning = beginning
+    this.ending = ending
+    this.authorName = authorName
   }
-}
-
-type ColorStyle = {
-  backgroundColor: string;
-  color: string;
 }
 
 type TextColorStyle = {
-  color: string;
+  readonly backgroundColor: string;
+  readonly color: string;
+  readonly textShadow: string;
 }
 
 type ColorSet = {
-  textColor: string;
-  plainColor: string;
-  softenedColor: string;
+  readonly mainColor: Chroma.Color;
+  readonly blackAndWhiteColor: Chroma.Color;
+  readonly contrastiveColor: Chroma.Color;
 }
 
 type ExCadRow = {
-  index: number;
-  isLast: boolean;
-  token: ExCadToken;
-  style: ColorStyle;
-  fuzzyStyle: TextColorStyle;
+  readonly index: number;
+  readonly isAlmostLast: boolean;
+  readonly isLast: boolean;
+  readonly token: ExCadToken;
+  readonly style: TextColorStyle;
+  readonly fuzzyStyle: TextColorStyle;
 }
 
-function generateNiceColor(isDark: boolean): [number, number, number] {
-  const color: [number, number, number] = [0, 0, 0]
-  const offset = isDark ? 64 : 0
-  const j = Math.floor(3 * Math.random())
-  for (let i = 0; i < 3; i++)
-  {
-    if (i == j)
-      color[i] = isDark ? 0 : 255
-    else
-      color[i] = Math.floor(192 * Math.random()) + offset
-  }
-  return color
-}
-
+const minimalLightness = 0.2
+const generatedTextLength = 20
+const firstColorMinimalDistinct = 60.0
+const distinctColorCount = 5
 const charCodeForA: number = 'a'.charCodeAt(0)
+
+function generateNiceColor(): Chroma.Color {
+  const hue = 360 * Math.random()
+  const lightness = (1.0 - minimalLightness) * Math.random() + minimalLightness
+  return Chroma.hsl(hue, 1.0, lightness)
+}
 
 function generateText(): string {
   let text = ""
-  for(let i = 0; i < 20; i++) {
+  for(let i = 0; i < generatedTextLength; i++) {
     const charCode = charCodeForA + Math.floor(26 * Math.random())
     text += String.fromCharCode(charCode)
     if (Math.random() > 0.7)
@@ -101,21 +104,34 @@ function generateText(): string {
   return text
 }
 
-const generatedSets: ColorSet[] =
-  Array(1000).fill(null).map(() => {
-    const isBgDark = Math.random() > 0.5
-    const bcolor = generateNiceColor(isBgDark)
-    const tcolor = isBgDark ? "white" : "black"
-    const scolor: [number, number, number] = [0, 0, 0]
-    scolor[0] = Math.floor(bcolor[0] * 0.75)
-    scolor[1] = Math.floor(bcolor[1] * 0.75)
-    scolor[2] = Math.floor(bcolor[2] * 0.75)
-    return {
-      plainColor: `rgb(${bcolor[0]}, ${bcolor[1]}, ${bcolor[2]})`,
-      textColor: tcolor,
-      softenedColor: `rgb(${scolor[0]}, ${scolor[1]}, ${scolor[2]})`,
+function generateColorSets(count: number): ColorSet[] {
+  const colorSets = Array(count).fill(null) as ColorSet[]
+  let i = 0;
+  while (i < count) {
+    const mainColor = generateNiceColor().alpha(0.8)
+    let tooSimilar = false
+    for (let j = 1; j < distinctColorCount && !tooSimilar; ++j) {
+      if (i < j)
+        continue;
+      const previousColor = colorSets[i - j].mainColor
+      tooSimilar =
+        Chroma.distance(previousColor, mainColor, 'lab') <
+        firstColorMinimalDistinct * (j + 1) / distinctColorCount
     }
-  })
+    if (tooSimilar) {
+      console.log(`Collision for ${i}`)
+      continue
+    }
+    const mainColorIsLight = mainColor.lch()[0] > 75.0
+    const blackAndWhiteColor = mainColorIsLight ? Chroma('black') : Chroma('white')
+    const contrastiveColor = mainColorIsLight ? mainColor.brighten(1.5) : mainColor.darken(2.5)
+    colorSets[i] = { mainColor, blackAndWhiteColor, contrastiveColor, }
+    ++i
+  }
+  return colorSets
+}
+
+const generatedSets: ColorSet[] = generateColorSets(100)
 
 export default Vue.component('ex-cad',
 {
@@ -124,38 +140,58 @@ export default Vue.component('ex-cad',
       type: Array as () => ExCadToken[],
       required: true,
     },
-    isSecret : {
-      type: Boolean,
+    mode: {
+      type: Object as () => ExCadMode,
       required: true,
     }
   },
   data: function() { return { } },
   methods: {
-    transformToken: function(token: ExCadToken, isLast: boolean): ExCadToken {
-      if (!this.isSecret)
+    transformToken: function(
+      token: ExCadToken,
+      isAlmostLast: boolean,
+      isLast: boolean,
+    ): ExCadToken {
+      if (this.mode === ExCadMode.Disclosed)
         return token
       return new ExCadToken(
           token.authorName,
-          generateText(),
-          isLast ? token.ending : generateText())
+          isLast ? token.beginning : generateText(),
+          isLast || isAlmostLast ? token.ending : generateText())
     },
     getRows: function*(): Iterable<ExCadRow> {
       let index = 0
       const length: number = this.tokens.length
       for (const otoken of this.tokens) {
         const set = generatedSets[index]
+        const shadowColor = set.contrastiveColor.hex('rgb')
         const style = {
-          backgroundColor: set.plainColor,
-          color: set.textColor,
+          backgroundColor: set.mainColor.hex('rgba'),
+          color: set.blackAndWhiteColor.hex('rgb'),
+          textShadow: `-1px 0 ${shadowColor}, 0 1px ${shadowColor}, 1px 0 ${shadowColor}, 0 -1px ${shadowColor}`,
         }
+        const hsl = set.mainColor.hsl()
+        const paleColor = Chroma.
+          hsl(hsl[0], hsl[1], hsl[2] * 0.95).alpha(0.5).hex('rgba')
+        const palerColor = Chroma.
+          hsl(hsl[0], hsl[1], hsl[2] * 0.98).alpha(0.5).hex('rgba')
         const fuzzyStyle = {
-          color: set.softenedColor,
+          backgroundColor: "none",
+          color: paleColor,
+          textShadow: `-0.5px 0 ${palerColor}, 0 0.5px ${palerColor}, 0.5px 0 ${palerColor}, 0 -0.5px ${palerColor}`,
         }
-        const isLast = index == length - 1
-        const token = this.transformToken(otoken, isLast)
-        yield { index, isLast, token, style, fuzzyStyle }
+        const isAlmostLast = index === length - 2
+        const isLast = index === length - 1
+        const token = this.transformToken(otoken, isAlmostLast, isLast)
+        yield { index, isAlmostLast, isLast, token, style, fuzzyStyle }
         ++index
       }
+    },
+    isDisclosed: function(): boolean {
+      return this.mode === ExCadMode.Disclosed;
+    },
+    isReadyForInput: function(): boolean {
+      return this.mode === ExCadMode.ReadyForInput;
     }
   },
 })
