@@ -13,7 +13,9 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import { Story } from '../backend'
+import { newStory as nstory} from '../backend'
+import axios, {AxiosResponse} from 'axios'
+
 
 const StoryModule = Vue.extend({
   data() {
@@ -24,9 +26,8 @@ const StoryModule = Vue.extend({
   },
   methods: {
     newStory () {
-      const story = new Story()
-      story.startRegistration(this.players).then(() => {
-        this.storyUrl = story.url
+      nstory(2).then((story) => {
+        this.storyUrl = "/stories/"+story.data.id
       })
     }
   }
