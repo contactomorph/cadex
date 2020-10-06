@@ -1,94 +1,92 @@
 <template>
-  <div>
-    <h1>L'histoire</h1>
-    {{ state }}
-    <h1>Le joueur</h1>
-    <Joiner v-on:playerSelected="addPlayerCallback"/>
-    <div>{{ message  }}</div>
-
+<div>
+  <h1>L'histoire</h1>
+  <span v-if="story && story.data.registering">Histoire ouverte, vous pouvez vous inscrire</span>
+  <span v-else><span v-if="story && !story.data.completed">Histoire fermée, vous pouvez jouer</span></span>
+  <div v-if="story.data.completed">
+    <h3>C'est terminé</h3>
     <div>
-      Je suis <span v-if="$store.state.me">{{ $store.state.me.data.name }}</span>
-      <span v-if="previous"> et je dois continuer "{{ previous }}"</span>
-    </div>
-
-    <div>
-      <input v-model="head" type="text" placeholder="la suite">
-      <input v-model="tail" type="text" placeholder="la fin">
-      <button @click="post">Play</button>
-    </div>
-
-    <div>
-      {{ myStory }}
+      <span v-for="(player, num) in story.data.players" :key="num"><span v-if="player">{{player.head}}&nbsp;{{player.tail}}&nbsp;</span></span>
     </div>
   </div>
+
+  <h1>Les joueurs</h1>
+  <div>
+    <div v-for="(player, num) in story.data.players" :key="num">
+      <span v-if="player">{{ player.name }}</span>
+    </div>
+
+    <input type="text" v-model="name" placeholder="ton nom"><button @click="join">Rejoindre / Changer de nom</button>
+  </div>
+
+  <h1>Le joueur</h1>
+  Mon nom: <span v-if="player">{{ player.data.name }}</span>, <span v-if="player && player.data.myTurn">c'est mon tour, je dois continuer
+    "{{ player.data.ptail }}"
+  </span><span v-else>ce n'est pas mon tour</span>
+  <div>
+    <textarea type="text" v-model="head" placeholder="la suite"></textarea>
+    <textarea type="text" v-model="tail" placeholder="la fin"></textarea>
+    <button @click="play">Play</button>
+  </div>
+
+
+</div>
 </template>
 
 <script lang="ts">
-import Vue from 'vue'
-import { Story, StoryState, Player, Chunk } from '../backend'
-import Joiner from '@/components/Joiner.vue'
+  import Vue from 'vue'
+import { Story, registerPlayer, Player, getUID } from '../backend'
 
 const StoryModule = Vue.extend({
-  components: {
-    Joiner
-  },
   data() {
     return {
-      previous: "",
-      message: "No story",
-      head: "",
-      tail: "",
-      storyUrl: "",
-      myStory: "",
-      state: ""
+      story: null as null | Story,
+      player: null as null | Player,
+      name: '',
+      head: '',
+      tail: '',
+      myTurn: false,
+      truc: null,
+      text: ''
     }
   },
   created () {
-    this.join()
+    const story = new Story(this.$route.params.storyId)
+    story.enableAutoUpdate()
+    this.story = story
+    getUID().then((uid) => {
+      const player = new Player(story.data.id, uid)
+      this.player = player
+      player.enableAutoUpdate()
+    })
   },
   methods: {
-    refreshState (story: Story) {
-      switch(story.data.state) {
-        case StoryState.Starting:
-          this.state = "Début"
-          break
-        case StoryState.Registering:
-          this.state = "On attend les derniers joueur"
-          break
-        case StoryState.Writting:
-          this.state =  "L'histoire s'écrit"
-          break
-        case StoryState.End:
-          this.state = "C'est la fin"
-          break
-        default:
-          this.state = "Error"
+    async play() {
+      if (!this.player) {
+        return
       }
-    },
-    post() {
-      this.$store.state.me.play(this.head, this.tail)
-    },
-    theEnd (chunks: Array<Chunk>) {
-      for (const chunk of chunks) {
-        this.myStory += (chunk.head + ' ' + chunk.tail + ' ')
-      }
-    },
-    join () {
-      this.$store.commit('joinStory', this.$route.params.storyId)
-      const story = this.$store.state.story
-      story.load().then(() => {
-        story.addUpdateCallback(this.refreshState)
-        story.addTheEndCallback(this.theEnd)
+      await this.player.update({
+        played: true,
+        head: this.head,
+        tail: this.tail
       })
-
     },
-    addPlayerCallback () {
-      this.message = "This is not my turn"
-      const myTurn = (me: Player, tail: string) => {
-        this.message = "This is my turn !!!"
-        this.previous = tail
+    async join () {
+      if (!this.story || !this.player) {
+        return
       }
-      this.$store.state.me.addMyTurnCallback(myTurn)
+      const player = this.player
+
+      await player.load()
+
+      if (player.exists) {
+        /* Already register just update name */
+        await player.update({name: this.name})
+      } else {
+        /* Not yet registered */
+        player.data.name = this.name
+        await registerPlayer(player)
+      }
     }
   }
 })
