@@ -43,9 +43,6 @@ bower_components
 # Compiled binary addons (http://nodejs.org/api/addons.html)
 build/Release
 
-# Dependency directories
-node_modules/
-
 # Optional npm cache directory
 .npm
 
@@ -65,7 +62,6 @@ node_modules/
 .env
 
 .DS_Store
-node_modules
 /dist
 
 
@@ -87,3 +83,22 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+\#*
+.\#*
+
+## Compiled JavaScript files
+**/*.js
+**/*.js.map
+
+# Typescript v1 declaration files
+typings/
+
+# Dependency directories
+**/node_modules/
+
+package-lock.json
+
+# Include files
+!**/.eslintrc.js
+!**/babel.config.js
