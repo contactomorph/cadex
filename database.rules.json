@@ -1,7 +1,7 @@
 {
   /* Visit https://firebase.google.com/docs/database/security to learn more about security rules. */
   "rules": {
-    "chunks": {
+    "players": {
       "$storyId": {
         "$userId": {
           ".read": "$userId == auth.uid && root.child('stories').child('$storyId').exists()",
@@ -13,7 +13,7 @@
       ".read": true,
       ".write": false
     },
-    "privateStories": {
+    "playerMap": {
       ".read": false,
       ".write": false
     }
