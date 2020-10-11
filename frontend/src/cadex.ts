@@ -112,7 +112,7 @@ class PlayerPrivateData extends PlayerPublicData {
  */
 class PlayerPrivate extends DBObject<PlayerPrivateData> {
   constructor(sid: string, uid: string) {
-    super(firebase.database().ref('chunks').child(sid).child(uid), new PlayerPrivateData())
+    super(firebase.database().ref('players').child(sid).child(uid), new PlayerPrivateData())
     this.data.sid = sid
     this.data.id = uid
   }
@@ -169,7 +169,7 @@ interface PlayerOrderData {
 class PlayerOrder extends DBObject<PlayerOrderData> {
   constructor(sid: string) {
     super(
-      firebase.database().ref('privateStories').child(sid),
+      firebase.database().ref('playerMap').child(sid),
       {} as PlayerOrderData
     )
   }
@@ -224,7 +224,7 @@ class Story extends DBObject<StoryData> {
      * finalize function copies final data from private space
      * of players into the public space
      */
-    const privateData = (await firebase.database().ref('chunks').child(this.data.id).once('value')).val()
+    const privateData = (await firebase.database().ref('players').child(this.data.id).once('value')).val()
 
     const tgt = {} as { [key: number]: Partial<PlayerPrivateData> }
     const all = Object.values(privateData) as Array<PlayerPrivateData>
