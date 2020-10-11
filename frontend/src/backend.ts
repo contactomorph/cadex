@@ -5,18 +5,24 @@ import 'firebase/auth'
 import axios, {AxiosResponse} from 'axios'
 import { PlayerPrivate, Story } from './cadex'
 
+const isDev = window.location.host.startsWith('localhost')
+const databaseURL = (isDev) ? "http://localhost:9000/?ns=cadex-a057e": "https://cadex-a057e.firebaseio.com"
+//databaseURL: "http://localhost:9000/?ns=undefined",
+
 const firebaseConfig = {
   apiKey: "AIzaSyC8rR63t7K3Spv97jNn7bvlq8EHVXB479s",
   authDomain: "cadex-a057e.firebaseapp.com",
-  //databaseURL: "https://cadex-a057e.firebaseio.com",
-  databaseURL: "http://localhost:9000/?ns=cadex-a057e",
-  //databaseURL: "http://localhost:9000/?ns=undefined",
+  databaseURL: databaseURL,
   projectId: "cadex-a057e",
   storageBucket: "cadex-a057e.appspot.com",
   messagingSenderId: "633469560244",
   appId: "1:633469560244:web:1ff4dfdeef557038d47ee1"
 }
 
+/**
+ * Enable trigger a promise from the outside
+ *
+ */
 class Deffered<T> extends Promise<T> {
   private resolve: ((o: T) => void) | null
 
@@ -45,12 +51,21 @@ class Deffered<T> extends Promise<T> {
   }
 }
 
-const uuid = new Deffered<string>()
+/**
+ * The user (anonymous) id
+ */
+const uid = new Deffered<string>()
 
+/**
+ * Get asynchronously the User (anonymous) user id
+ */
 function getUID(): Promise<string> {
-  return uuid
+  return uid
 }
 
+/**
+ * Initialize the backend
+ */
 function initialize() {
   console.log("Initialize backend")
 
@@ -58,7 +73,7 @@ function initialize() {
 
   firebase.auth().onAuthStateChanged(function(user) {
     if (user) {
-      uuid.trigger(user.uid)
+      uid.trigger(user.uid)
     }
   })
 
@@ -67,33 +82,35 @@ function initialize() {
   })
 }
 
-class Chunk {
-}
-
-async function newStory(players: number) {
-  const resp = await axios.post('http://localhost:5001/cadex-a057e/us-central1/newStory', {
-    players: players
-  }, {
+async function jsonPOST<T>(func: string, data: T) {
+  const resp = await axios.post('http://localhost:5001/cadex-a057e/us-central1/' + func, data, {
     headers: {
       'content-type': 'application/json'
     }
   })
 
+  return resp
+}
+
+/**
+ * Create a new story
+ */
+async function newStory(players: number) {
+  const resp = await jsonPOST('newStory', {players: players})
+
   const story = new Story(resp.data.id)
   return story
 }
 
+/**
+ * Register a player in a story
+ */
 async function registerPlayer(player: PlayerPrivate) {
   const uid = await getUID()
-
-  const resp = await axios.post('http://localhost:5001/cadex-a057e/us-central1/newPlayer', {
+  const resp = await jsonPOST('newPlayer', {
     uid: uid,
     storyId: player.data.sid,
     name: player.data.name
-  }, {
-    headers: {
-      'content-type': 'application/json'
-    }
   })
   return player
 }
@@ -102,7 +119,6 @@ export {
   initialize,
   Story as Story,
   PlayerPrivate as Player,
-  Chunk as Chunk,
   newStory,
   registerPlayer,
   getUID
