@@ -17,7 +17,7 @@ exports.registeringUpdate = functions.database.ref('/players/{sid}').onUpdate(as
   /* Registering */
   if (story.data.registering) {
     /* Check number of player and set registering false if everybody is here */
-    if (Object.keys(chunks).length == story.data.playerNumber) {
+    if (Object.keys(chunks).length === story.data.playerNumber) {
       await playerOrder.load()
       await story.update({
         registering : false,
@@ -45,8 +45,8 @@ exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(as
   await story.load()
   await playerOrder.load()
 
-  if (turnData.num != num) {
-    snapshot.before.ref.update({
+  if (turnData.num !== num) {
+    await snapshot.before.ref.update({
       num: num
     })
     return false
