@@ -7,6 +7,7 @@ import { PlayerPrivate, Story } from './cadex'
 
 const isDev = window.location.host.startsWith('localhost')
 const databaseURL = (isDev) ? "http://localhost:9000/?ns=cadex-a057e": "https://cadex-a057e.firebaseio.com"
+const functionURL = (isDev) ? "http://localhost:5001/cadex-a057e/us-central1/": "https://us-central1-cadex-a057e.cloudfunctions.net/"
 
 const firebaseConfig = {
   apiKey: "AIzaSyC8rR63t7K3Spv97jNn7bvlq8EHVXB479s",
@@ -82,7 +83,7 @@ function initialize() {
 }
 
 async function jsonPOST<T>(func: string, data: T) {
-  const resp = await axios.post('http://localhost:5001/cadex-a057e/us-central1/' + func, data, {
+  const resp = await axios.post(functionURL + func, data, {
     headers: {
       'content-type': 'application/json'
     }
