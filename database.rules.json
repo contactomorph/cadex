@@ -4,8 +4,8 @@
     "players": {
       "$storyId": {
         "$userId": {
-          ".read": "$userId == auth.uid && root.child('stories').child('$storyId').exists()",
-          ".write": "$userId == auth.uid && root.child('stories').child('$storyId').exists()"
+          ".read": "$userId == auth.uid && root.child('stories').child($storyId).exists()",
+          ".write": "$userId == auth.uid && root.child('stories').child($storyId).exists()"
         }
       }
     },

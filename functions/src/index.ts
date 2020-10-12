@@ -6,7 +6,7 @@ import * as firebase from 'firebase-admin'
 firebase.initializeApp();
 const corswrapper = cors({origin: true})
 
-exports.registeringUpdate = functions.database.ref('chunks/{sid}').onUpdate(async (snapshot, ctx) => {
+exports.registeringUpdate = functions.database.ref('/players/{sid}').onUpdate(async (snapshot, ctx) => {
   const sid = ctx.params.sid
   const story = new Story(sid)
   const playerOrder = new PlayerOrder(sid)
@@ -33,7 +33,7 @@ exports.registeringUpdate = functions.database.ref('chunks/{sid}').onUpdate(asyn
 
 
 // Chunk Update
-exports.chunkUpdate = functions.database.ref('chunks/{sid}/{uid}').onUpdate(async (snapshot, ctx) => {
+exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(async (snapshot, ctx) => {
   const uid = ctx.params.uid
   const sid = ctx.params.sid
   const turnData = snapshot.after.val()
