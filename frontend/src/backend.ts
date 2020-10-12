@@ -7,7 +7,6 @@ import { PlayerPrivate, Story } from './cadex'
 
 const isDev = window.location.host.startsWith('localhost')
 const databaseURL = (isDev) ? "http://localhost:9000/?ns=cadex-a057e": "https://cadex-a057e.firebaseio.com"
-//databaseURL: "http://localhost:9000/?ns=undefined",
 
 const firebaseConfig = {
   apiKey: "AIzaSyC8rR63t7K3Spv97jNn7bvlq8EHVXB479s",

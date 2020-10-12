@@ -30,6 +30,13 @@
   </div>
 
 
+  <div>
+    <h1>Debug</h1>
+    <input type="text" v-model="baduid" placeholder="baduid">
+    <button @click="testBadUID">Create a player with bad uid</button>
+    <button @click="testUpdateStory">Try to modify story</button>
+  </div>
+
 </div>
 </template>
 
@@ -47,7 +54,8 @@ const StoryModule = Vue.extend({
       tail: '',
       myTurn: false,
       truc: null,
-      text: ''
+      text: '',
+      baduid: ''
     }
   },
   created () {
@@ -87,6 +95,27 @@ const StoryModule = Vue.extend({
         player.data.name = this.name
         await registerPlayer(player)
       }
+    },
+
+    testBadUID () {
+      if (!this.story) {
+        return
+      }
+      const player = new Player(this.story.data.id, this.baduid)
+      player.update({
+        name: "corrupt name",
+        head: "corrupt head",
+        tail: "corrupt tail"
+      })
+    },
+
+    testUpdateStory () {
+      if (!this.story) {
+        return
+      }
+      this.story.update({
+        playerNumber: -1
+      })
     }
   }
 })
