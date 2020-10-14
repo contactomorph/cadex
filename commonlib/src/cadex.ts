@@ -1,5 +1,4 @@
 import { v4 as uuid } from 'uuid'
-import * as firebase from 'firebase-admin'
 
 function oupdate(tgt: { [key: string]: any }, src: { [key: string]: any }) {
   for (const key of Object.keys(tgt)) {
@@ -9,7 +8,43 @@ function oupdate(tgt: { [key: string]: any }, src: { [key: string]: any }) {
   }
 }
 
-type Reference = firebase.database.Reference
+/**
+ * Select statically the firebase SDK
+ */
+
+interface DataSnapshot {
+  child(path: string): DataSnapshot;
+  exists(): boolean;
+  key: string | null;
+  ref: Reference;
+  val(): any;
+}
+
+interface Reference {
+  on(
+    eventType: 'value',
+    callback: (a: DataSnapshot, b?: string | null) => any,
+  ): any;
+
+  once(eventType: 'value'): Promise<DataSnapshot>;
+
+  child(path: string): Reference;
+
+  update(values: Object): Promise<any>;
+}
+
+interface Database {
+  ref(path?: string | Reference): Reference;
+}
+
+class FirebaseSDK {
+  public static DB: Database
+}
+
+function initializeCadex(db: Database) {
+  FirebaseSDK.DB = db
+}
+
 
 /**
  * DBObject<T> is an object in firebase realtime database
@@ -19,7 +54,7 @@ type Reference = firebase.database.Reference
 class DBObject<T> {
   protected ref: Reference
   public readonly data: T
-  private readonly listeners = new Array<(o: DBObject<T>) => void>()
+  private readonly listeners = [] as Array<(o: DBObject<T>) => void>
   public exists = false
 
   constructor(ref: Reference, data: T) {
@@ -60,7 +95,7 @@ class DBObject<T> {
     }
   }
 
-  public enableAutoUpdate() {
+  public async enableAutoUpdate() {
     this.ref.on('value', (snapshot) => {
       const data = snapshot.val()
       this.exists = (data)? true: false
@@ -94,13 +129,16 @@ class PlayerPublicData {
  */
 class PlayerPublic extends DBObject<PlayerPublicData> {
   constructor(sid: string, num: number) {
-    super(firebase.database().ref('stories').child(sid).child('players').child(num.toString()), new PlayerPublicData())
+    super(FirebaseSDK.DB.ref('stories').child(sid).child('players').child(num.toString()), new PlayerPublicData())
     this.data.sid = sid
     this.data.num = num
   }
 }
 
 class PlayerPrivateData extends PlayerPublicData {
+  constructor() {
+    super()
+  }
   id = ''
   head = ''
   tail = ''
@@ -112,7 +150,7 @@ class PlayerPrivateData extends PlayerPublicData {
  */
 class PlayerPrivate extends DBObject<PlayerPrivateData> {
   constructor(sid: string, uid: string) {
-    super(firebase.database().ref('players').child(sid).child(uid), new PlayerPrivateData())
+    super(FirebaseSDK.DB.ref('players').child(sid).child(uid), new PlayerPrivateData())
     this.data.sid = sid
     this.data.id = uid
   }
@@ -169,7 +207,7 @@ interface PlayerOrderData {
 class PlayerOrder extends DBObject<PlayerOrderData> {
   constructor(sid: string) {
     super(
-      firebase.database().ref('playerMap').child(sid),
+      FirebaseSDK.DB.ref('playerMap').child(sid),
       {} as PlayerOrderData
     )
   }
@@ -213,7 +251,7 @@ class Story extends DBObject<StoryData> {
   constructor(id?: string) {
     const theid = (id)? id: uuid()
     super(
-      firebase.database().ref('stories').child(theid),
+      FirebaseSDK.DB.ref('stories').child(theid),
       new StoryData()
     )
     this.data.id = theid
@@ -224,17 +262,18 @@ class Story extends DBObject<StoryData> {
      * finalize function copies final data from private space
      * of players into the public space
      */
-    const privateData = (await firebase.database().ref('players').child(this.data.id).once('value')).val()
-
+    const privateData = (await FirebaseSDK.DB.ref('players').child(this.data.id).once('value')).val()
 
     const tgt = {} as { [key: number]: Partial<PlayerPrivateData> }
     const all = Object.values(privateData) //as Array<PlayerPrivateData> tslint bug with this assignation
 
     /* do not forget to remove private id of the players */
     for (const player of all) {
-      const tplayer = player as PlayerPrivateData
-      tgt[tplayer.num] = tplayer
-      delete tplayer['id']
+      const tplayer = player as Partial<PlayerPrivateData>
+      if (tplayer.num) {
+        tgt[tplayer.num] = tplayer
+        delete tplayer['id']
+      }
     }
 
     /* set completed flag to true and copy data */
@@ -249,5 +288,6 @@ export {
   Player as Player,
   PlayerPrivate as PlayerPrivate,
   Story as Story,
-  PlayerOrder as PlayerOrder
+  PlayerOrder as PlayerOrder,
+  initializeCadex
 }
