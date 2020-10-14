@@ -1,9 +1,11 @@
 import * as functions from 'firebase-functions'
 import * as cors from 'cors'
-import { Player, Story, PlayerOrder} from './cadex'
+import { Player, Story, PlayerOrder, initializeCadex} from 'cadexlib'
 import * as firebase from 'firebase-admin'
 
 firebase.initializeApp();
+initializeCadex(firebase.database())
+
 const corswrapper = cors({origin: true})
 
 exports.registeringUpdate = functions.database.ref('/players/{sid}').onUpdate(async (snapshot, ctx) => {

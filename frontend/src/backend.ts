@@ -3,7 +3,7 @@ import 'firebase/database'
 import 'firebase/auth'
 //import * as crypto from 'crypto'
 import axios, {AxiosResponse} from 'axios'
-import { PlayerPrivate, Story } from './cadex'
+import { PlayerPrivate, Story, initializeCadex } from 'cadexlib'
 
 const isDev = window.location.host.startsWith('localhost')
 const databaseURL = (isDev) ? "http://localhost:9000/?ns=cadex-a057e": "https://cadex-a057e.firebaseio.com"
@@ -70,6 +70,8 @@ function initialize() {
   console.log("Initialize backend")
 
   firebase.initializeApp(firebaseConfig)
+
+  initializeCadex(firebase.database())
 
   firebase.auth().onAuthStateChanged(function(user) {
     if (user) {
