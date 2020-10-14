@@ -211,12 +211,12 @@ class StoryData {
  */
 class Story extends DBObject<StoryData> {
   constructor(id?: string) {
-    id = (id)? id: uuid()
+    const theid = (id)? id: uuid()
     super(
-      firebase.database().ref('stories').child(id),
+      firebase.database().ref('stories').child(theid),
       new StoryData()
     )
-    this.data.id = id
+    this.data.id = theid
   }
 
   public async finalize() {
@@ -227,12 +227,13 @@ class Story extends DBObject<StoryData> {
     const privateData = (await firebase.database().ref('players').child(this.data.id).once('value')).val()
 
     const tgt = {} as { [key: number]: Partial<PlayerPrivateData> }
-    const all = Object.values(privateData) as Array<PlayerPrivateData>
+    const all = Object.values(privateData) //as Array<PlayerPrivateData> tslint bug with this assignation
 
     /* do not forget to remove private id of the players */
     for (const player of all) {
-      tgt[player.num] = player
-      delete player['id']
+      const tplayer = player as PlayerPrivateData
+      tgt[tplayer.num] = tplayer
+      delete tplayer['id']
     }
 
     /* set completed flag to true and copy data */
