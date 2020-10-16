@@ -102,3 +102,4 @@ package-lock.json
 # Include files
 !**/.eslintrc.js
 !**/babel.config.js
+!**/vue.config.js
