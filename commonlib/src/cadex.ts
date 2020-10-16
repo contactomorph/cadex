@@ -1,6 +1,10 @@
 import { v4 as uuid } from 'uuid'
 
-function oupdate(tgt: { [key: string]: any }, src: { [key: string]: any }) {
+class DataType {
+  [key: string]: unknown
+}
+
+function oupdate(tgt: DataType, src: DataType): void {
   for (const key of Object.keys(tgt)) {
     if (key in tgt && src[key] !== undefined && src[key] !== null) {
       tgt[key] = src[key];
@@ -17,20 +21,25 @@ interface DataSnapshot {
   exists(): boolean;
   key: string | null;
   ref: Reference;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   val(): any;
 }
 
 interface Reference {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   on(
     eventType: 'value',
     callback: (a: DataSnapshot, b?: string | null) => any,
   ): any;
+  /* eslint-enable */
 
   once(eventType: 'value'): Promise<DataSnapshot>;
 
   child(path: string): Reference;
 
+  /* eslint-disable */
   update(values: Object): Promise<any>;
+  /* eslint-enable */
 }
 
 interface Database {
@@ -41,7 +50,7 @@ class FirebaseSDK {
   public static DB: Database
 }
 
-function initializeCadex(db: Database) {
+function initializeCadex(db: Database): void {
   FirebaseSDK.DB = db
 }
 
@@ -51,7 +60,7 @@ function initializeCadex(db: Database) {
  * It adds some shortcuts for load and save
  *
  */
-class DBObject<T> {
+class DBObject<T extends DataType> {
   protected ref: Reference
   public readonly data: T
   private readonly listeners = [] as Array<(o: DBObject<T>) => void>
@@ -62,7 +71,7 @@ class DBObject<T> {
     this.data = data
   }
 
-  protected updateData(data: Partial<T>) {
+  protected updateData(data: Partial<T>): void {
     oupdate(this.data, data)
   }
 
@@ -114,7 +123,7 @@ class DBObject<T> {
   }
 }
 
-class PlayerPublicData {
+class PlayerPublicData extends DataType {
   name = ''
   played = false
   myTurn = false
@@ -176,28 +185,28 @@ class Player {
     this.privateData = this._private.data
   }
 
-  public async load() {
+  public async load(): Promise<void> {
     await this._public.load()
     await this._private.load()
   }
 
-  public async save() {
+  public async save(): Promise<void> {
     await this._public.save()
     await this._private.save()
   }
 
-  public async update(data: Partial<PlayerPrivateData>, all?: boolean) {
+  public async update(data: Partial<PlayerPrivateData>, all?: boolean): Promise<void> {
     await this._public.update(data, all)
     await this._private.update(data, all)
   }
 
-  public toJSON() {
+  public toJSON(): PlayerPublicData {
     return this._public.toJSON()
   }
 }
 
-interface PlayerOrderData {
-  [key: string]: string;
+interface PlayerOrderData extends DataType {
+  [key: number]: string;
 }
 /**
  * PlayerOrder objects are a map to retrive the player id
@@ -212,7 +221,7 @@ class PlayerOrder extends DBObject<PlayerOrderData> {
     )
   }
 
-  protected updateData(data: Partial<PlayerOrderData>) {
+  protected updateData(data: Partial<PlayerOrderData>): void {
     Object.assign(this.data, data)
   }
 
@@ -220,22 +229,22 @@ class PlayerOrder extends DBObject<PlayerOrderData> {
    * Find the player id from its number for a story
    */
   public who(num: number): string {
-    return this.data[num.toString()]
+    return this.data[num]
   }
 
   /**
    * Record a player id with the right number
    */
-  public async register(num: number, uid: string) {
+  public async register(num: number, uid: string): Promise<void> {
     const data = { } as PlayerOrderData
-    data[num.toString()] = uid
+    data[num] = uid
 
     await super.update(data)
   }
 
 }
 
-class StoryData {
+class StoryData extends DataType {
   id = ''
   playerNumber = 0
   registering = true
@@ -257,7 +266,7 @@ class Story extends DBObject<StoryData> {
     this.data.id = theid
   }
 
-  public async finalize() {
+  public async finalize(): Promise<void> {
     /**
      * finalize function copies final data from private space
      * of players into the public space
