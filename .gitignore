@@ -62,7 +62,7 @@ build/Release
 .env
 
 .DS_Store
-/dist
+**/dist
 
 
 # local env files
