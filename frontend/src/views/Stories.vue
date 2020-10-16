@@ -14,7 +14,6 @@
 <script lang="ts">
 import Vue from 'vue'
 import { newStory as nstory} from '../backend'
-import axios, {AxiosResponse} from 'axios'
 
 
 const StoryModule = Vue.extend({

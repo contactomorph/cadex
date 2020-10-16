@@ -1,6 +1,5 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
-import { Story, Player } from '../backend'
 
 Vue.use(Vuex)
 

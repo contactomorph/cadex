@@ -2,7 +2,7 @@ import * as firebase from 'firebase/app'
 import 'firebase/database'
 import 'firebase/auth'
 //import * as crypto from 'crypto'
-import axios, {AxiosResponse} from 'axios'
+import axios from 'axios'
 import { PlayerPrivate, Story, initializeCadex } from 'cadexlib'
 
 const isDev = window.location.host.startsWith('localhost')
@@ -33,10 +33,10 @@ class Deffered<T> extends Promise<T> {
       return
     }
     let res = null
-    const promise = new Promise<T>((resolve, reject) => {
+    const promise = new Promise<T>((resolve) => {
       res = resolve
     })
-    super((resolve, reject) => {
+    super((resolve) => {
       promise.then((x: T) => {
         resolve(x)
       })
@@ -109,7 +109,7 @@ async function newStory(players: number) {
  */
 async function registerPlayer(player: PlayerPrivate) {
   const uid = await getUID()
-  const resp = await jsonPOST('newPlayer', {
+  await jsonPOST('newPlayer', {
     uid: uid,
     storyId: player.data.sid,
     name: player.data.name
