@@ -8,7 +8,7 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import ExCad, { ExCadMode, ExCadToken } from "./ExCad.vue";
+import ExCad, { ExCadMode, ExCadToken } from "../components/ExCad.vue";
 
 const FirebaseModule2 = Vue.extend({
   data () {
