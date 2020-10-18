@@ -50,7 +50,7 @@ cd backend
 ### Run backend / emulator
 Run functions (backend logic) and a local database
 ```
-firebase emulators:start --only functions,database
+firebase emulators:start --only "functions,database"
 ```
 
 ### (Re-)Compile
