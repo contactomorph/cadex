@@ -3,6 +3,9 @@
     <h1>This is a second firebase integration example</h1>
     <button type="button" @click="changeMode">{{buttonText}}</button>
     <ex-cad :tokens="tokens"></ex-cad>
+    <ul>
+      <li v-for="(token, num) in tokens" :key="num">{{token.beginning}}&nbsp;{{token.ending}}</li>
+    </ul>
   </div>
 </template>
 

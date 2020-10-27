@@ -21,8 +21,8 @@
               <span :style="row.fuzzyStyle">{{ row.token.ending }}</span>
           </template>
           <template v-else>
-              <input type="text" class="ex_cad_input" :style="row.style" :value="row.token.beginning">&nbsp;|&nbsp;
-              <input type="text" class="ex_cad_input" :style="row.style" :value="row.token.ending">
+              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.token.beginning">&nbsp;|&nbsp;
+              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.token.ending">
           </template>
         </td>
       </tr>
@@ -33,7 +33,7 @@
 <style>
 .ex_cad_frame {
   width: 700px;
-  background-image: url("https://d2gg9evh47fn9z.cloudfront.net/800px_COLOURBOX1171229.jpg");
+  background-image: url("../assets/tile.jpg");
   background-repeat: repeat;
   font-family: Avenir, Helvetica, Arial, sans-serif;
   font-weight: normal;
@@ -77,10 +77,11 @@ import Chroma from 'chroma-js'
 export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
 export class ExCadToken {
-  readonly beginning: string
-  readonly ending: string
   readonly authorName: string
   readonly mode: ExCadMode
+  beginning: string
+  ending: string
+
   constructor(authorName: string, beginning: string, ending: string, mode: ExCadMode) {
     this.beginning = beginning
     this.ending = ending
