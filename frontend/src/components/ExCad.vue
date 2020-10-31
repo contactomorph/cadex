@@ -151,8 +151,8 @@ type ExCadRow = {
 
 const minimalLightness = 0.2
 const generatedTextLength = 20
-const firstColorMinimalDistinct = 60.0
-const distinctColorCount = 5
+const firstColorMinimalDifference= 80.0
+const distinctColorCount = 7
 const charCodeForA: number = 'a'.charCodeAt(0)
 const spaceProbability = 0.3
 const defaultAlpha = 0.9
@@ -182,7 +182,7 @@ function generateColorSets(count: number): ColorSet[] {
       const previousColor = colorSets[i - j].mainColor
       distinctEnough =
         Chroma.distance(previousColor, mainColor, 'lab') >=
-        firstColorMinimalDistinct * (j + 1) / distinctColorCount
+        firstColorMinimalDifference * (distinctColorCount + 1 - j) / distinctColorCount
     }
     if (!distinctEnough)
       continue
