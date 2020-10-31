@@ -32,8 +32,7 @@ const FirebaseModule2 = Vue.extend({
   },
   methods: {
     changeMode: function() {
-      switch(this.mode)
-      {
+      switch(this.mode) {
         case ExCadMode.Disclosed:
           this.mode = ExCadMode.ReadyForInput
           this.buttonText = "Hide"

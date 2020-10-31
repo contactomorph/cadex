@@ -6,23 +6,23 @@
        <col span="1">
       </colgroup>
       <tr class="ex_cad_table_th"><th>Joueurs</th><th>Texte</th></tr>
-      <tr v-for="row in getRows()" :key="row.index" :style="row.style">
+      <tr v-for="row in rows" :key="row.index" :style="row.style">
         <td class="ex_cad_col1">{{ row.token.authorName }}: </td>
         <td class="ex_cad_col2">
           <template v-if="row.token.isDisclosed()">
-            <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
+            <span>{{ row.beginning }}&nbsp;{{ row.ending }}</span>
           </template>
           <template v-else-if="row.token.isHalfHidden()">
-              <span :style="row.fuzzyStyle">{{ row.token.beginning }}</span>&nbsp;
-              <span>{{ row.token.ending }}</span>
+              <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
+              <span>{{ row.ending }}</span>
           </template>
           <template v-else-if="row.token.isHidden()">
-              <span :style="row.fuzzyStyle">{{ row.token.beginning }}</span>&nbsp;
-              <span :style="row.fuzzyStyle">{{ row.token.ending }}</span>
+              <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
+              <span :style="row.fuzzyStyle">{{ row.ending }}</span>
           </template>
           <template v-else>
-              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.token.beginning">&nbsp;|&nbsp;
-              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.token.ending">
+              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.beginning">&nbsp;|&nbsp;
+              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.ending">
           </template>
         </td>
       </tr>
@@ -124,6 +124,8 @@ type ColorSet = {
 type ExCadRow = {
   readonly index: number;
   readonly token: ExCadToken;
+  readonly beginning: string;
+  readonly ending: string;
   readonly style: TextColorStyle;
   readonly fuzzyStyle: TextColorStyle;
 }
@@ -133,6 +135,7 @@ const generatedTextLength = 20
 const firstColorMinimalDistinct = 60.0
 const distinctColorCount = 5
 const charCodeForA: number = 'a'.charCodeAt(0)
+const spaceProbability = 0.3
 const defaultAlpha = 0.9
 
 function generateNiceColor(): Chroma.Color {
@@ -146,19 +149,15 @@ function generateColorSets(count: number): ColorSet[] {
   let i = 0;
   while (i < count) {
     const mainColor = generateNiceColor().alpha(defaultAlpha)
-    let tooSimilar = false
-    for (let j = 1; j < distinctColorCount && !tooSimilar; ++j) {
-      if (i < j)
-        continue;
+    let distinctEnough = true
+    for (let j = 1; j < distinctColorCount && j <= i && distinctEnough; ++j) {
       const previousColor = colorSets[i - j].mainColor
-      tooSimilar =
-        Chroma.distance(previousColor, mainColor, 'lab') <
+      distinctEnough =
+        Chroma.distance(previousColor, mainColor, 'lab') >=
         firstColorMinimalDistinct * (j + 1) / distinctColorCount
     }
-    if (tooSimilar) {
-      console.log(`Collision for ${i}`)
+    if (!distinctEnough)
       continue
-    }
     const mainColorIsLight = mainColor.lch()[0] > 75.0
     const blackAndWhiteColor = mainColorIsLight ? Chroma('black') : Chroma('white')
     const contrastiveColor = mainColorIsLight ? mainColor.brighten(1.5) : mainColor.darken(2.5)
@@ -173,7 +172,7 @@ function generateText(): string {
   for(let i = 0; i < generatedTextLength; i++) {
     const charCode = charCodeForA + Math.floor(26 * Math.random())
     text += String.fromCharCode(charCode)
-    if (Math.random() > 0.7)
+    if (Math.random() < spaceProbability)
       text += ' '
   }
   return text
@@ -188,8 +187,7 @@ function generateTextSets(count: number): [string, string][] {
 const generatedSets: ColorSet[] = generateColorSets(100)
 const generatedTexts: [string, string][] = generateTextSets(100)
 
-export default Vue.component('ex-cad',
-{
+export default Vue.component('ex-cad', {
   props: {
     tokens: {
       type: Array as () => ExCadToken[],
@@ -197,32 +195,11 @@ export default Vue.component('ex-cad',
     }
   },
   data: function() { return { } },
-  methods: {
-    transformToken: function(
-      token: ExCadToken,
-      index: number,
-    ): ExCadToken {
-      switch (token.mode) {
-        case ExCadMode.Disclosed:
-        case ExCadMode.ReadyForInput:
-          return token
-        case ExCadMode.HalfHidden:
-          return new ExCadToken(
-              token.authorName,
-              generatedTexts[index][0],
-              token.ending,
-              token.mode)
-        case ExCadMode.Hidden:
-          return new ExCadToken(
-              token.authorName,
-              generatedTexts[index][0],
-              generatedTexts[index][1],
-              token.mode)
-      }
-    },
-    getRows: function*(): Iterable<ExCadRow> {
+  computed: {
+    rows: function(): ExCadRow[] {
       let index = 0
-      for (const otoken of this.tokens) {
+      const rows = [] as ExCadRow[]
+      for (const token of this.tokens) {
         const set = generatedSets[index]
         const shadowColor = set.contrastiveColor.hex('rgb')
         const style = {
@@ -240,11 +217,26 @@ export default Vue.component('ex-cad',
           color: paleColor,
           textShadow: `-0.5px 0 ${palerColor}, 0 0.5px ${palerColor}, 0.5px 0 ${palerColor}, 0 -0.5px ${palerColor}`,
         }
-        const token = this.transformToken(otoken, index)
-        yield { index, token, style, fuzzyStyle }
+        const [beginning, ending] = this.transformToken(token, index) as [string, string]
+        const row = { index, token, style, fuzzyStyle, beginning, ending }
+        rows.push(row)
         ++index
       }
-    },
+      return rows
+    }
+  },
+  methods: {
+    transformToken: function(token: ExCadToken, index: number): [string, string] {
+      switch (token.mode) {
+        case ExCadMode.Disclosed:
+        case ExCadMode.ReadyForInput:
+          return [token.beginning, token.ending]
+        case ExCadMode.HalfHidden:
+          return [generatedTexts[index][0], token.ending]
+        case ExCadMode.Hidden:
+          return [generatedTexts[index][0], generatedTexts[index][1]]
+      }
+    }
   },
 })
 </script>
