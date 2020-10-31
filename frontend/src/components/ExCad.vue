@@ -9,21 +9,31 @@
       <tr v-for="row in rows" :key="row.index" :style="row.style">
         <td class="ex_cad_col1">{{ row.token.authorName }}: </td>
         <td class="ex_cad_col2">
-          <template v-if="row.token.isDisclosed()">
-            <span>{{ row.beginning }}&nbsp;{{ row.ending }}</span>
-          </template>
-          <template v-else-if="row.token.isHalfHidden()">
-              <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
-              <span>{{ row.ending }}</span>
-          </template>
-          <template v-else-if="row.token.isHidden()">
-              <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
-              <span :style="row.fuzzyStyle">{{ row.ending }}</span>
-          </template>
-          <template v-else>
-              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.beginning">&nbsp;|&nbsp;
-              <input type="text" class="ex_cad_input" :style="row.style" v-model="row.ending">
-          </template>
+          <span class="ex_cad_span" :style="{ opacity: row.opacity.hidden }">
+            <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
+            <span :style="row.fuzzyStyle">{{ row.ending }}</span>
+          </span>
+          <span class="ex_cad_span" :style="{ opacity: row.opacity.halfHidden }">
+            <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
+            <span>{{ row.token.ending }}</span>
+          </span>
+          <span class="ex_cad_span" :style="{ opacity: row.opacity.disclosed }">
+            <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
+          </span>
+          <span class="ex_cad_span" :style="{ opacity: row.opacity.readForInput }">
+            <input
+              type="text"
+              class="ex_cad_input"
+              :disabled="row.opacity.readForInput < 1"
+              :style="row.style"
+              v-model="row.token.beginning">&nbsp;|&nbsp;
+            <input
+              type="text"
+              class="ex_cad_input"
+              :disabled="row.opacity.readForInput < 1"
+              :style="row.style"
+              v-model="row.token.ending">
+          </span>
         </td>
       </tr>
     </table>
@@ -60,6 +70,14 @@
 }
 .ex_cad_col2 {
   text-align: left;
+  position: relative;
+}
+.ex_cad_span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
 }
 .ex_cad_input {
   width: 45%;
@@ -73,6 +91,7 @@
 <script lang="ts">
 import Vue from 'vue'
 import Chroma from 'chroma-js'
+import { UnboundedProgressiveEvent } from '../utils/ProgressiveEvent'
 
 export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
@@ -88,25 +107,6 @@ export class ExCadToken {
     this.authorName = authorName
     this.mode = mode
   }
-  changeMode(mode: ExCadMode): ExCadToken {
-    return new ExCadToken(
-      this.authorName,
-      this.beginning,
-      this.ending,
-      mode)
-  }
-  isDisclosed(): boolean {
-    return this.mode === ExCadMode.Disclosed
-  }
-  isHalfHidden(): boolean {
-    return this.mode === ExCadMode.HalfHidden
-  }
-  isHidden(): boolean {
-    return this.mode === ExCadMode.Hidden
-  }
-  isReadyForInput(): boolean {
-    return this.mode === ExCadMode.ReadyForInput
-  }
 }
 
 type TextColorStyle = {
@@ -117,8 +117,26 @@ type TextColorStyle = {
 
 type ColorSet = {
   readonly mainColor: Chroma.Color;
+  readonly paleColor: Chroma.Color;
+  readonly palerColor: Chroma.Color;
   readonly blackAndWhiteColor: Chroma.Color;
   readonly contrastiveColor: Chroma.Color;
+}
+
+class ExCadRowOpacity {
+  disclosed: number
+  halfHidden: number
+  hidden: number
+  readForInput: number
+  mode: ExCadMode
+
+  constructor() {
+    this.disclosed = 0
+    this.halfHidden = 0
+    this.hidden = 1.0
+    this.readForInput = 0
+    this.mode = ExCadMode.Hidden
+  }
 }
 
 type ExCadRow = {
@@ -128,6 +146,7 @@ type ExCadRow = {
   readonly ending: string;
   readonly style: TextColorStyle;
   readonly fuzzyStyle: TextColorStyle;
+  readonly opacity: ExCadRowOpacity;
 }
 
 const minimalLightness = 0.2
@@ -137,6 +156,15 @@ const distinctColorCount = 5
 const charCodeForA: number = 'a'.charCodeAt(0)
 const spaceProbability = 0.3
 const defaultAlpha = 0.9
+const opacityDelta = 0.1
+
+function increment(opacity: number): number {
+  return Math.min(1.0, opacity + opacityDelta)
+}
+
+function decrement(opacity: number): number {
+  return Math.max(0.0, opacity - opacityDelta)
+}
 
 function generateNiceColor(): Chroma.Color {
   const hue = 360 * Math.random()
@@ -161,7 +189,10 @@ function generateColorSets(count: number): ColorSet[] {
     const mainColorIsLight = mainColor.lch()[0] > 75.0
     const blackAndWhiteColor = mainColorIsLight ? Chroma('black') : Chroma('white')
     const contrastiveColor = mainColorIsLight ? mainColor.brighten(1.5) : mainColor.darken(2.5)
-    colorSets[i] = { mainColor, blackAndWhiteColor, contrastiveColor, }
+    const hsl = mainColor.hsl()
+    const paleColor = Chroma.hsl(hsl[0], hsl[1], hsl[2] * 0.90)
+    const palerColor = Chroma.hsl(hsl[0], hsl[1], hsl[2] * 0.95)
+    colorSets[i] = { mainColor, paleColor, palerColor, blackAndWhiteColor, contrastiveColor, }
     ++i
   }
   return colorSets
@@ -194,11 +225,17 @@ export default Vue.component('ex-cad', {
       required: true,
     }
   },
-  data: function() { return { } },
+  data: function() { return { rowOpacities: [] } },
+  created: function() {
+    const progressing = new UnboundedProgressiveEvent(60, () => this.makeProgress())
+    const self = (this as unknown) as { progressing: UnboundedProgressiveEvent }
+    self.progressing = progressing
+  },
   computed: {
     rows: function(): ExCadRow[] {
       let index = 0
       const rows = [] as ExCadRow[]
+      const rowOpacities = this.rowOpacities as ExCadRowOpacity[]
       for (const token of this.tokens) {
         const set = generatedSets[index]
         const shadowColor = set.contrastiveColor.hex('rgb')
@@ -207,36 +244,73 @@ export default Vue.component('ex-cad', {
           color: set.blackAndWhiteColor.hex('rgb'),
           textShadow: `-1px 0 ${shadowColor}, 0 1px ${shadowColor}, 1px 0 ${shadowColor}, 0 -1px ${shadowColor}`,
         }
-        const hsl = set.mainColor.hsl()
-        const paleColor = Chroma.
-          hsl(hsl[0], hsl[1], hsl[2] * 0.90).hex('rgb')
-        const palerColor = Chroma.
-          hsl(hsl[0], hsl[1], hsl[2] * 0.95).hex('rgb')
+        const palerColor = set.palerColor.hex('rgb')
         const fuzzyStyle = {
           backgroundColor: "none",
-          color: paleColor,
+          color: set.paleColor.hex('rgb'),
           textShadow: `-0.5px 0 ${palerColor}, 0 0.5px ${palerColor}, 0.5px 0 ${palerColor}, 0 -0.5px ${palerColor}`,
         }
-        const [beginning, ending] = this.transformToken(token, index) as [string, string]
-        const row = { index, token, style, fuzzyStyle, beginning, ending }
+        const beginning = generatedTexts[index][0]
+        const ending = generatedTexts[index][1]
+        if (rowOpacities.length <= index)
+          rowOpacities.push(new ExCadRowOpacity());
+        const opacity: ExCadRowOpacity = rowOpacities[index]
+        opacity.mode = token.mode
+        const row = { index, token, style, fuzzyStyle, beginning, ending, opacity }
         rows.push(row)
         ++index
       }
+      const self = (this as unknown) as { progressing: UnboundedProgressiveEvent }
+      self.progressing.fire()
       return rows
     }
   },
   methods: {
-    transformToken: function(token: ExCadToken, index: number): [string, string] {
-      switch (token.mode) {
-        case ExCadMode.Disclosed:
-        case ExCadMode.ReadyForInput:
-          return [token.beginning, token.ending]
-        case ExCadMode.HalfHidden:
-          return [generatedTexts[index][0], token.ending]
-        case ExCadMode.Hidden:
-          return [generatedTexts[index][0], generatedTexts[index][1]]
+    makeProgress: function(): boolean {
+      const rowOpacities: ExCadRowOpacity[] = this.rowOpacities
+      let changed = false
+      for (const o of rowOpacities) {
+        switch (o.mode) {
+          case ExCadMode.Hidden:
+            if (o.hidden < 1.0) {
+              o.hidden = increment(o.hidden)
+              o.halfHidden = decrement(o.halfHidden)
+              o.disclosed = decrement(o.disclosed)
+              o.readForInput = decrement(o.readForInput)
+              changed = true
+            }
+            break
+          case ExCadMode.HalfHidden:
+            if (o.halfHidden < 1.0) {
+              o.hidden = decrement(o.hidden)
+              o.halfHidden = increment(o.halfHidden)
+              o.disclosed = decrement(o.disclosed)
+              o.readForInput = decrement(o.readForInput)
+              changed = true
+            }
+            break
+          case ExCadMode.Disclosed:
+            if (o.disclosed < 1.0) {
+              o.hidden = decrement(o.hidden)
+              o.halfHidden = decrement(o.halfHidden)
+              o.disclosed = increment(o.disclosed)
+              o.readForInput = decrement(o.readForInput)
+              changed = true
+            }
+            break
+          case ExCadMode.ReadyForInput:
+            if (o.readForInput < 1.0) {
+              o.hidden = decrement(o.hidden)
+              o.halfHidden = decrement(o.halfHidden)
+              o.disclosed = decrement(o.disclosed)
+              o.readForInput = increment(o.readForInput)
+              changed = true
+            }
+            break
+        }
       }
+      return changed
     }
-  },
+  }
 })
 </script>

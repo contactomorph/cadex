@@ -13,6 +13,14 @@
 import Vue from 'vue'
 import ExCad, { ExCadMode, ExCadToken } from "../components/ExCad.vue";
 
+function changeMode(token: ExCadToken, mode: ExCadMode): ExCadToken {
+  return new ExCadToken(
+    token.authorName,
+    token.beginning,
+    token.ending,
+    mode)
+}
+
 const FirebaseModule2 = Vue.extend({
   data () {
     return {
@@ -52,7 +60,7 @@ const FirebaseModule2 = Vue.extend({
       }
       const newTokens = [] as ExCadToken[]
       for (const token of this.tokens as ExCadToken[])
-        newTokens.push(token.changeMode(this.mode))
+        newTokens.push(changeMode(token, this.mode))
       this.tokens = newTokens
     }
   },
