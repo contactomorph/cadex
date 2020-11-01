@@ -78,6 +78,7 @@
   top: 0;
   right: 0;
   bottom: 0;
+  transition: opacity 0.4s linear;
 }
 .ex_cad_input {
   width: 45%;
@@ -91,7 +92,6 @@
 <script lang="ts">
 import Vue from 'vue'
 import Chroma from 'chroma-js'
-import { UnboundedProgressiveEvent } from '../utils/ProgressiveEvent'
 
 export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
@@ -128,14 +128,33 @@ class ExCadRowOpacity {
   halfHidden: number
   hidden: number
   readForInput: number
-  mode: ExCadMode
 
   constructor() {
     this.disclosed = 0
     this.halfHidden = 0
     this.hidden = 1.0
     this.readForInput = 0
-    this.mode = ExCadMode.Hidden
+  }
+}
+
+function setMode(opacity: ExCadRowOpacity, mode: ExCadMode) {
+  switch(mode) {
+    case ExCadMode.Disclosed:
+      opacity.disclosed = 1.0
+      opacity.halfHidden = opacity.hidden = opacity.readForInput = 0.0
+      break
+    case ExCadMode.HalfHidden:
+      opacity.halfHidden = 1.0
+      opacity.disclosed = opacity.hidden = opacity.readForInput = 0.0
+      break
+    case ExCadMode.Hidden:
+      opacity.hidden = 1.0
+      opacity.disclosed = opacity.halfHidden = opacity.readForInput = 0.0
+      break
+    case ExCadMode.ReadyForInput:
+      opacity.readForInput = 1.0
+      opacity.disclosed = opacity.halfHidden = opacity.hidden = 0.0
+      break
   }
 }
 
@@ -156,15 +175,6 @@ const distinctColorCount = 7
 const charCodeForA: number = 'a'.charCodeAt(0)
 const spaceProbability = 0.3
 const defaultAlpha = 0.9
-const opacityDelta = 0.1
-
-function increment(opacity: number): number {
-  return Math.min(1.0, opacity + opacityDelta)
-}
-
-function decrement(opacity: number): number {
-  return Math.max(0.0, opacity - opacityDelta)
-}
 
 function generateNiceColor(): Chroma.Color {
   const hue = 360 * Math.random()
@@ -226,11 +236,6 @@ export default Vue.component('ex-cad', {
     }
   },
   data: function() { return { rowOpacities: [] } },
-  created: function() {
-    const progressing = new UnboundedProgressiveEvent(60, () => this.makeProgress())
-    const self = (this as unknown) as { progressing: UnboundedProgressiveEvent }
-    self.progressing = progressing
-  },
   computed: {
     rows: function(): ExCadRow[] {
       let index = 0
@@ -255,61 +260,12 @@ export default Vue.component('ex-cad', {
         if (rowOpacities.length <= index)
           rowOpacities.push(new ExCadRowOpacity());
         const opacity: ExCadRowOpacity = rowOpacities[index]
-        opacity.mode = token.mode
+        setMode(opacity, token.mode)
         const row = { index, token, style, fuzzyStyle, beginning, ending, opacity }
         rows.push(row)
         ++index
       }
-      const self = (this as unknown) as { progressing: UnboundedProgressiveEvent }
-      self.progressing.fire()
       return rows
-    }
-  },
-  methods: {
-    makeProgress: function(): boolean {
-      const rowOpacities: ExCadRowOpacity[] = this.rowOpacities
-      let changed = false
-      for (const o of rowOpacities) {
-        switch (o.mode) {
-          case ExCadMode.Hidden:
-            if (o.hidden < 1.0) {
-              o.hidden = increment(o.hidden)
-              o.halfHidden = decrement(o.halfHidden)
-              o.disclosed = decrement(o.disclosed)
-              o.readForInput = decrement(o.readForInput)
-              changed = true
-            }
-            break
-          case ExCadMode.HalfHidden:
-            if (o.halfHidden < 1.0) {
-              o.hidden = decrement(o.hidden)
-              o.halfHidden = increment(o.halfHidden)
-              o.disclosed = decrement(o.disclosed)
-              o.readForInput = decrement(o.readForInput)
-              changed = true
-            }
-            break
-          case ExCadMode.Disclosed:
-            if (o.disclosed < 1.0) {
-              o.hidden = decrement(o.hidden)
-              o.halfHidden = decrement(o.halfHidden)
-              o.disclosed = increment(o.disclosed)
-              o.readForInput = decrement(o.readForInput)
-              changed = true
-            }
-            break
-          case ExCadMode.ReadyForInput:
-            if (o.readForInput < 1.0) {
-              o.hidden = decrement(o.hidden)
-              o.halfHidden = decrement(o.halfHidden)
-              o.disclosed = decrement(o.disclosed)
-              o.readForInput = increment(o.readForInput)
-              changed = true
-            }
-            break
-        }
-      }
-      return changed
     }
   }
 })
