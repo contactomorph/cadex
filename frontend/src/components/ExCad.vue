@@ -9,28 +9,26 @@
       <tr v-for="row in rows" :key="row.index" :style="row.style">
         <td class="ex_cad_col1">{{ row.token.authorName }}: </td>
         <td class="ex_cad_col2">
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.hidden }">
+          <span class="ex_cad_span" :style="getHiddenOpacity(row.token.mode)">
             <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
             <span :style="row.fuzzyStyle">{{ row.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.halfHidden }">
+          <span class="ex_cad_span" :style="getHalfHiddenOpacity(row.token.mode)">
             <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
             <span>{{ row.token.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.disclosed }">
+          <span class="ex_cad_span" :style="getDisclosedOpacity(row.token.mode)">
             <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.readForInput }">
+          <span class="ex_cad_span" :style="getReadyForInputOpacity(row.token.mode)">
             <input
               type="text"
               class="ex_cad_input"
-              :disabled="row.opacity.readForInput < 1"
               :style="row.style"
               v-model="row.token.beginning">&nbsp;|&nbsp;
             <input
               type="text"
               class="ex_cad_input"
-              :disabled="row.opacity.readForInput < 1"
               :style="row.style"
               v-model="row.token.ending">
           </span>
@@ -123,41 +121,6 @@ type ColorSet = {
   readonly contrastiveColor: Chroma.Color;
 }
 
-class ExCadRowOpacity {
-  disclosed: number
-  halfHidden: number
-  hidden: number
-  readForInput: number
-
-  constructor() {
-    this.disclosed = 0
-    this.halfHidden = 0
-    this.hidden = 1.0
-    this.readForInput = 0
-  }
-}
-
-function setMode(opacity: ExCadRowOpacity, mode: ExCadMode) {
-  switch(mode) {
-    case ExCadMode.Disclosed:
-      opacity.disclosed = 1.0
-      opacity.halfHidden = opacity.hidden = opacity.readForInput = 0.0
-      break
-    case ExCadMode.HalfHidden:
-      opacity.halfHidden = 1.0
-      opacity.disclosed = opacity.hidden = opacity.readForInput = 0.0
-      break
-    case ExCadMode.Hidden:
-      opacity.hidden = 1.0
-      opacity.disclosed = opacity.halfHidden = opacity.readForInput = 0.0
-      break
-    case ExCadMode.ReadyForInput:
-      opacity.readForInput = 1.0
-      opacity.disclosed = opacity.halfHidden = opacity.hidden = 0.0
-      break
-  }
-}
-
 type ExCadRow = {
   readonly index: number;
   readonly token: ExCadToken;
@@ -165,7 +128,12 @@ type ExCadRow = {
   readonly ending: string;
   readonly style: TextColorStyle;
   readonly fuzzyStyle: TextColorStyle;
-  readonly opacity: ExCadRowOpacity;
+}
+
+type OpacityStyle = { readonly opacity: number }
+
+function getOpacity(actualMode: ExCadMode, expectedMode: ExCadMode): OpacityStyle {
+  return { opacity: actualMode === expectedMode ? 1.0 : 0.0 }
 }
 
 const minimalLightness = 0.2
@@ -234,13 +202,12 @@ export default Vue.component('ex-cad', {
       type: Array as () => ExCadToken[],
       required: true,
     }
-  },
-  data: function() { return { rowOpacities: [] } },
+  }, 
+  data: function() { return {} },
   computed: {
     rows: function(): ExCadRow[] {
       let index = 0
       const rows = [] as ExCadRow[]
-      const rowOpacities = this.rowOpacities as ExCadRowOpacity[]
       for (const token of this.tokens) {
         const set = generatedSets[index]
         const shadowColor = set.contrastiveColor.hex('rgb')
@@ -257,16 +224,18 @@ export default Vue.component('ex-cad', {
         }
         const beginning = generatedTexts[index][0]
         const ending = generatedTexts[index][1]
-        if (rowOpacities.length <= index)
-          rowOpacities.push(new ExCadRowOpacity());
-        const opacity: ExCadRowOpacity = rowOpacities[index]
-        setMode(opacity, token.mode)
-        const row = { index, token, style, fuzzyStyle, beginning, ending, opacity }
+        const row = { index, token, style, fuzzyStyle, beginning, ending }
         rows.push(row)
         ++index
       }
       return rows
     }
+  },
+  methods: {
+    getHiddenOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.Hidden),
+    getHalfHiddenOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.HalfHidden),
+    getDisclosedOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.Disclosed),
+    getReadyForInputOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.ReadyForInput),
   }
 })
 </script>
