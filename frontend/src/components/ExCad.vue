@@ -9,26 +9,28 @@
       <tr v-for="row in rows" :key="row.index" :style="row.style">
         <td class="ex_cad_col1">{{ row.token.authorName }}: </td>
         <td class="ex_cad_col2">
-          <span class="ex_cad_span" :style="getHiddenOpacity(row.token.mode)">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 0 ? 1.0 : 0.0 }">
             <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
             <span :style="row.fuzzyStyle">{{ row.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="getHalfHiddenOpacity(row.token.mode)">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 1 ? 1.0 : 0.0 }">
             <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
             <span>{{ row.token.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="getDisclosedOpacity(row.token.mode)">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 2 ? 1.0 : 0.0 }">
             <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="getReadyForInputOpacity(row.token.mode)">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 3 ? 1.0 : 0.0 }">
             <input
               type="text"
               class="ex_cad_input"
+              :disabled="row.token.mode !== 3"
               :style="row.style"
               v-model="row.token.beginning">&nbsp;|&nbsp;
             <input
               type="text"
               class="ex_cad_input"
+              :disabled="row.token.mode !== 3"
               :style="row.style"
               v-model="row.token.ending">
           </span>
@@ -130,12 +132,6 @@ type ExCadRow = {
   readonly fuzzyStyle: TextColorStyle;
 }
 
-type OpacityStyle = { readonly opacity: number }
-
-function getOpacity(actualMode: ExCadMode, expectedMode: ExCadMode): OpacityStyle {
-  return { opacity: actualMode === expectedMode ? 1.0 : 0.0 }
-}
-
 const minimalLightness = 0.2
 const generatedTextLength = 20
 const firstColorMinimalDifference= 80.0
@@ -230,12 +226,6 @@ export default Vue.component('ex-cad', {
       }
       return rows
     }
-  },
-  methods: {
-    getHiddenOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.Hidden),
-    getHalfHiddenOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.HalfHidden),
-    getDisclosedOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.Disclosed),
-    getReadyForInputOpacity: (mode: ExCadMode) => getOpacity(mode, ExCadMode.ReadyForInput),
   }
 })
 </script>
