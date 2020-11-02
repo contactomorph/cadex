@@ -2,7 +2,7 @@
   <div>
     <h1>Créer un nouvelle histoire</h1>
     <div>
-      <input v-model="players" min="2" type="number">
+      <input v-model="adminName"  type="text" placeholder="nom">
       <button @click="newStory">Créer</button>
       <div>
         <a :href="storyUrl">Lien vers l'histoire</a>
@@ -19,13 +19,13 @@ import { newStory as nstory} from '../backend'
 const StoryModule = Vue.extend({
   data() {
     return {
-      players: 2,
       storyUrl: "",
+      adminName: ""
     }
   },
   methods: {
     newStory () {
-      nstory(2).then((story) => {
+      nstory(this.adminName).then((story) => {
         this.storyUrl = "/stories/"+story.data.id
       })
     }

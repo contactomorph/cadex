@@ -1,6 +1,10 @@
 {
   "name": "functions",
+  "watch": {
+    "build": "src/index.ts"
+  },
   "scripts": {
+    "watch": "npm-watch",
     "lint": "tslint --project tsconfig.json",
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
@@ -20,6 +24,7 @@
     "cors": "^2.8.5",
     "firebase-admin": "^8.10.0",
     "firebase-functions": "^3.6.1",
+    "npm-watch": "^0.7.0",
     "uuid": "^8.3.0"
   },
   "devDependencies": {

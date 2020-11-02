@@ -97,10 +97,14 @@ async function jsonPOST<T>(func: string, data: T) {
 /**
  * Create a new story
  */
-async function newStory(players: number) {
-  const resp = await jsonPOST('newStory', {players: players})
+async function newStory(name: string) {
+  const uid = await getUID()
+  const resp = await jsonPOST('newStory', {
+    name: name,
+    uid: uid
+  })
 
-  const story = new Story(resp.data.id)
+  const story = new Story(resp.data.story.id)
   return story
 }
 
@@ -117,11 +121,21 @@ async function registerPlayer(player: PlayerPrivate) {
   return player
 }
 
+async function closeStory(storyId: string) {
+  const uid = await getUID()
+  await jsonPOST('closeStory', {
+    uid: uid,
+    storyId: storyId
+  })
+  return true
+}
+
 export {
   initialize,
   Story as Story,
   PlayerPrivate as Player,
   newStory,
+  closeStory,
   registerPlayer,
   getUID
 }

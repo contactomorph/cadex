@@ -8,33 +8,46 @@ initializeCadex(firebase.database())
 
 const corswrapper = cors({origin: true})
 
-exports.registeringUpdate = functions.database.ref('/players/{sid}').onUpdate(async (snapshot, ctx) => {
-  const sid = ctx.params.sid
-  const story = new Story(sid)
-  const playerOrder = new PlayerOrder(sid)
-  const chunks = snapshot.after.val()
+console.log("Loaded...")
 
+exports.playerCreated = functions.database.ref('/players/{sid}/{uid}').onCreate(async (snapshot, ctx) => {
+  const uid = ctx.params.uid
+  const sid = ctx.params.sid
+
+  const num = snapshot.val().num
+  console.log("num", num)
+
+  const story = new Story(sid)
   await story.load()
 
-  /* Registering */
-  if (story.data.registering) {
-    /* Check number of player and set registering false if everybody is here */
-    if (Object.keys(chunks).length === story.data.playerNumber) {
-      await playerOrder.load()
-      await story.update({
-        registering : false,
-        currentPlayer: 1
-      })
-
-      await (new Player(sid, playerOrder.who(1), 1)).update({ myTurn: true })
-    }
+  if (story.data.currentPlayer !== num) {
+    /* This is not my turn, do nothing */
+    return
   }
 
-  return false
+  /* Else get back the previous tail */
+  const playerOrder = new PlayerOrder(sid)
+
+  await story.load()
+  await playerOrder.load()
+
+  const curr = new Player(sid, uid, num)
+  const prev = playerOrder.who(num - 1)
+
+  let ptail = ''
+  if (prev) {
+    await prev.load()
+    ptail = prev.privateData.tail
+  }
+
+  /* And update myTurn */
+  await curr.update({
+    ptail: ptail,
+    myTurn: true
+  })
+
 })
 
-
-// Chunk Update
 exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(async (snapshot, ctx) => {
   const uid = ctx.params.uid
   const sid = ctx.params.sid
@@ -47,48 +60,47 @@ exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(as
   await story.load()
   await playerOrder.load()
 
+  const curr = new Player(sid, uid, num)
+  const next = playerOrder.who(num + 1)
+
+  /* Can not modify num */
   if (turnData.num !== num) {
-    await snapshot.before.ref.update({
-      num: num
-    })
-    return false
+    await curr.update({ num: num })
+    return
   }
 
-  const player = new Player(sid, uid, num)
-
+  /* But name can be modify */
   if (name !== turnData.name) {
-    await player.update({ name: turnData.name })
+    await curr.update({ name: turnData.name })
   }
 
+  /* If it is not a play modification, quit */
   if (
-    story.data.registering ||
       story.data.currentPlayer !== num ||
       !turnData.played ||
       story.data.players[num].played ||
       !playerOrder.who(num)
   ) {
-    return false
+    return
   }
 
-  await player.update({
+  // Else update
+
+  await curr.update({
     played: true,
     myTurn: false
   })
 
-  if (num < story.data.playerNumber) {
-    const next = playerOrder.who(num + 1)
-    await (new Player(sid, next, num + 1)).update({
+  if (next) {
+    await next.update({
       ptail: turnData.tail,
       myTurn: true
     })
-
-    await story.update({currentPlayer: num + 1})
-
-  } else {
-    await story.finalize()
   }
 
-  return true
+  await story.update({currentPlayer: num + 1})
+
+  return
 })
 
 export const newStory = functions.https.onRequest((request, response) => {
@@ -98,16 +110,62 @@ export const newStory = functions.https.onRequest((request, response) => {
       return
     }
 
-    if (!request.body.players) {
+    if (!request.body.name || !request.body.uid) {
       response.status(400).end()
       return
     }
 
     const story = new Story()
-    story.data.playerNumber = request.body.players
-    await story.save()
+    const sid = story.data.id
+    const playerOrder = new PlayerOrder(sid)
 
-    response.json(story.toJSON())
+    await story.update({
+      currentPlayer: 0
+    }, true)
+
+    const player = new Player(sid, request.body.uid, 0)
+    await player.update({
+      id: request.body.uid,
+      name: request.body.name,
+      num: 0
+    }, true)
+
+    await playerOrder.register(0, request.body.uid)
+
+    response.json({
+      admin: player.toJSON(),
+      story: story.toJSON()
+    })
+  })
+})
+
+export const closeStory = functions.https.onRequest((request, response) => {
+  corswrapper(request, response, async () => {
+    if (request.method !== 'POST') {
+      response.status(404).end()
+      return
+    }
+
+    if (!request.body.storyId || !request.body.uid) {
+      response.status(400).end()
+      return
+    }
+
+    const sid = request.body.storyId
+    const playerOrder = new PlayerOrder(sid)
+    await playerOrder.load()
+
+    const player = playerOrder.who(0)
+
+    if (!player || player.privateData.id !== request.body.uid) {
+      response.status(403).end()
+      return
+    }
+
+    const story = new Story(sid)
+    await story.finalize()
+    response.json({})
+    return true
   })
 })
 
@@ -127,20 +185,15 @@ export const newPlayer = functions.https.onRequest((request, response) => {
     const playerOrder = new PlayerOrder(request.body.storyId)
     await story.load()
 
-    if (!story.data.registering) {
-      response.status(403).end()
-      return
-    }
+    const num = story.data.players.length
 
-    const num = story.data.currentPlayer + 1
     const player = new Player(story.data.id, request.body.uid, num)
-    await (player).update({
+    await player.update({
       id: request.body.uid,
       name: request.body.name,
       num: num
     }, true)
 
-    await story.update({currentPlayer: num})
     await playerOrder.register(num, player.privateData.id)
 
     response.json(player.toJSON())

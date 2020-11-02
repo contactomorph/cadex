@@ -1,17 +1,5 @@
 import { v4 as uuid } from 'uuid'
 
-class DataType {
-  [key: string]: unknown
-}
-
-function oupdate(tgt: DataType, src: DataType): void {
-  for (const key of Object.keys(tgt)) {
-    if (key in tgt && src[key] !== undefined && src[key] !== null) {
-      tgt[key] = src[key];
-    }
-  }
-}
-
 /**
  * Select statically the firebase SDK
  */
@@ -60,7 +48,7 @@ function initializeCadex(db: Database): void {
  * It adds some shortcuts for load and save
  *
  */
-class DBObject<T extends DataType> {
+class DBObject<T> {
   protected ref: Reference
   public readonly data: T
   private readonly listeners = [] as Array<(o: DBObject<T>) => void>
@@ -72,7 +60,14 @@ class DBObject<T extends DataType> {
   }
 
   protected updateData(data: Partial<T>): void {
-    oupdate(this.data, data)
+    const src = data as Record<string, unknown>
+    const tgt = this.data as Record<string, unknown>
+
+    for (const key of Object.keys(tgt)) {
+      if (src[key] !== undefined && src[key] !== null) {
+        tgt[key] = src[key]
+      }
+    }
   }
 
   public async load() {
@@ -123,11 +118,11 @@ class DBObject<T extends DataType> {
   }
 }
 
-class PlayerPublicData extends DataType {
+class PlayerPublicData {
   name = ''
   played = false
   myTurn = false
-  num = 0
+  num = -1
   sid = ''
 }
 /**
@@ -181,6 +176,7 @@ class Player {
   constructor(sid: string, uid: string, num: number) {
     this._public = new PlayerPublic(sid, num)
     this._private = new PlayerPrivate(sid, uid)
+    this._private.data.num = num
     this.publicData = this._public.data
     this.privateData = this._private.data
   }
@@ -205,7 +201,7 @@ class Player {
   }
 }
 
-interface PlayerOrderData extends DataType {
+interface PlayerOrderData {
   [key: number]: string;
 }
 /**
@@ -214,13 +210,17 @@ interface PlayerOrderData extends DataType {
  * only by admin user
  */
 class PlayerOrder extends DBObject<PlayerOrderData> {
+  private sid: string
+
   constructor(sid: string) {
     super(
       FirebaseSDK.DB.ref('playerMap').child(sid),
       {} as PlayerOrderData
     )
+    this.sid = sid
   }
 
+  /* Override updateData function */
   protected updateData(data: Partial<PlayerOrderData>): void {
     Object.assign(this.data, data)
   }
@@ -228,8 +228,13 @@ class PlayerOrder extends DBObject<PlayerOrderData> {
   /**
    * Find the player id from its number for a story
    */
-  public who(num: number): string {
-    return this.data[num]
+  public who(num: number): Player|null {
+    const uid = this.data[num]
+    if (uid) {
+      return new Player(this.sid, uid, num)
+    } else {
+      return null
+    }
   }
 
   /**
@@ -244,13 +249,14 @@ class PlayerOrder extends DBObject<PlayerOrderData> {
 
 }
 
-class StoryData extends DataType {
+type U<T> = { [K in keyof T] : T[K] }
+type PlayerStoryData = U<PlayerPublicData & Partial<PlayerPrivateData>>
+
+class StoryData {
   id = ''
-  playerNumber = 0
-  registering = true
   completed = false
   currentPlayer = 0
-  players: { [key: number]: Partial<PlayerPrivateData> } = {}
+  players = [] as Array<PlayerStoryData>
 }
 
 /**
@@ -273,13 +279,15 @@ class Story extends DBObject<StoryData> {
      */
     const privateData = (await FirebaseSDK.DB.ref('players').child(this.data.id).once('value')).val()
 
-    const tgt = {} as { [key: number]: Partial<PlayerPrivateData> }
-    const all = Object.values(privateData) //as Array<PlayerPrivateData> tslint bug with this assignation
+    const all = Object.values(privateData)
+    const tgt = new Array<PlayerStoryData>(all.length)
 
     /* do not forget to remove private id of the players */
     for (const player of all) {
-      const tplayer = player as Partial<PlayerPrivateData>
-      if (tplayer.num) {
+      const splayer = player as PlayerPrivateData
+      const tplayer = {} as PlayerStoryData
+      Object.assign(tplayer, splayer)
+      if (tplayer.num || tplayer.num === 0) {
         tgt[tplayer.num] = tplayer
         delete tplayer['id']
       }

@@ -6,6 +6,7 @@
     <ul>
       <li v-for="(token, num) in tokens" :key="num">{{token.beginning}}&nbsp;{{token.ending}}</li>
     </ul>
+    <button type="buyyon" @click="plop">Plop</button>
   </div>
 </template>
 
@@ -39,6 +40,11 @@ const FirebaseModule2 = Vue.extend({
     }
   },
   methods: {
+    plop: function() {
+      this.tokens.push(new ExCadToken(
+        "Yienyien", "ma tête", "ma queue", ExCadMode.Disclosed
+      ))
+    },
     changeMode: function() {
       switch(this.mode) {
         case ExCadMode.Disclosed:

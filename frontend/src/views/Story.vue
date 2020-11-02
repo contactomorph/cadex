@@ -1,14 +1,14 @@
 <template>
 <div>
   <h1>L'histoire</h1>
-  <p v-if="!story">Pas d'histoire</p>
-  <template v-else-if="story.data.registering">
-    <p>Histoire ouverte, vous pouvez vous inscrire</p>
+  <div v-if="player && player.data.num === 0">
+    <button @click="closeStory">Terminer l'histoire</button>
+  </div>
+  <div v-if="!player || player.data.num !== 0">
     <input type="text" v-model="name" placeholder="ton nom">
-    <button @click="join">Rejoindre / Changer de nom</button>
-  </template>
-  <p v-else-if="!story.data.completed">Histoire fermée, vous pouvez jouer</p>
-  <p v-else>Histoire terminée</p>
+    <button @click="join">Rejoindre</button>
+  </div>
+  <p v-if="story && story.data.completed">Histoire terminée</p>
 
   <h1>Les joueurs</h1>
 
@@ -30,25 +30,18 @@
     <p v-else>Ce n'est pas mon tour</p>
   </template>
 
-  <div>
-    <h1>Debug</h1>
-    <input type="text" v-model="baduid" placeholder="baduid">
-    <button @click="testBadUID">Create a player with bad uid</button>
-    <button @click="testUpdateStory">Try to modify story</button>
-  </div>
-
 </div>
 </template>
 
 <script lang="ts">
 import Vue from 'vue'
-import { Story, registerPlayer, Player, getUID } from '../backend'
+import { Story, registerPlayer, closeStory, Player, getUID,  } from '../backend'
 import { ExCadMode, ExCadToken } from "../components/ExCad.vue"
 
 const StoryModule = Vue.extend({
   data() {
     return {
-      story: null as null | Story,
+      story: new Story(this.$route.params.storyId),
       player: null as null | Player,
       name: '',
       myTurn: false,
@@ -57,11 +50,9 @@ const StoryModule = Vue.extend({
     }
   },
   created () {
-    const story = new Story(this.$route.params.storyId)
-    story.enableAutoUpdate()
-    this.story = story
+    this.story.enableAutoUpdate()
     getUID().then((uid) => {
-      const player = new Player(story.data.id, uid)
+      const player = new Player(this.story.data.id, uid)
       this.player = player
       player.enableAutoUpdate()
     })
@@ -71,15 +62,13 @@ const StoryModule = Vue.extend({
       if (!this.story || !this.player)
         return []
       const story: Story = this.story
-      if (story.data.registering)
-        return []
       const player: Player = this.player
       const tokens = [] as ExCadToken[];
       const currentPlayerIndex = story.data.currentPlayer
       const completed = story.data.completed
       const isMyTurn: boolean = player.data.myTurn
       const myNum: number = player.data.num
-      for(let i = 1; i <= currentPlayerIndex; ++i) {
+      for(let i = 0; i <= currentPlayerIndex; ++i) {
         const p = story.data.players[i]
         if (p) {
           const isMine = myNum === p.num
@@ -138,27 +127,10 @@ const StoryModule = Vue.extend({
         await registerPlayer(player)
       }
     },
-
-    testBadUID () {
-      if (!this.story) {
-        return
-      }
-      const player = new Player(this.story.data.id, this.baduid)
-      player.update({
-        name: "corrupt name",
-        head: "corrupt head",
-        tail: "corrupt tail"
-      })
-    },
-
-    testUpdateStory () {
-      if (!this.story) {
-        return
-      }
-      this.story.update({
-        playerNumber: -1
-      })
+    async closeStory (): Promise<void> {
+      closeStory(this.story.data.id)
     }
+
   }
 })
 
