@@ -5,16 +5,12 @@
       "$storyId": {
         "$userId": {
           ".read": "$userId == auth.uid && root.child('stories').child($storyId).exists()",
-          ".write": "$userId == auth.uid && root.child('stories').child($storyId).exists()"
+          ".write": false
         }
       }
     },
     "stories": {
       ".read": true,
-      ".write": false
-    },
-    "playerMap": {
-      ".read": false,
       ".write": false
     }
   }
