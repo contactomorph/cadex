@@ -1,7 +1,8 @@
 import * as functions from 'firebase-functions'
 import * as cors from 'cors'
-import { Player, Story, PlayerOrder, initializeCadex} from 'cadexlib'
+import { Player, Story, initializeCadex} from 'cadexlib'
 import * as firebase from 'firebase-admin'
+import * as crypto from 'crypto'
 
 firebase.initializeApp();
 initializeCadex(firebase.database())
@@ -10,32 +11,39 @@ const corswrapper = cors({origin: true})
 
 console.log("Loaded...")
 
+function encodeUID(sid: string, uid: string): string {
+  var cipher = crypto.createCipher('aes-256-cbc', sid + "secretkey")
+  var crypted = cipher.update(uid,'utf8','hex')
+  crypted += cipher.final('hex');
+  return crypted;
+}
+
+function decodeUID(sid: string, key: string): string {
+  var decipher = crypto.createDecipher('aes-256-cbc', sid + "secretkey")
+  var dec = decipher.update(key,'hex','utf8')
+  dec += decipher.final('utf8');
+  return dec;
+}
+
 exports.playerCreated = functions.database.ref('/players/{sid}/{uid}').onCreate(async (snapshot, ctx) => {
   const uid = ctx.params.uid
   const sid = ctx.params.sid
 
-  const num = snapshot.val().num
-  console.log("num", num)
-
   const story = new Story(sid)
   await story.load()
 
-  if (story.data.currentPlayer !== num) {
-    /* This is not my turn, do nothing */
+  if (story.data.currentPlayer !== '') {
     return
   }
 
-  /* Else get back the previous tail */
-  const playerOrder = new PlayerOrder(sid)
-
-  await story.load()
-  await playerOrder.load()
-
-  const curr = new Player(sid, uid, num)
-  const prev = playerOrder.who(num - 1)
+  const key = encodeUID(sid, uid)
+  const curr = new Player(sid, uid, key)
 
   let ptail = ''
-  if (prev) {
+
+  if (story.data.lastPlayer) {
+    const prevUid = decodeUID(sid, story.data.lastPlayer)
+    const prev = new Player(sid, prevUid, story.data.lastPlayer)
     await prev.load()
     ptail = prev.privateData.tail
   }
@@ -46,28 +54,24 @@ exports.playerCreated = functions.database.ref('/players/{sid}/{uid}').onCreate(
     myTurn: true
   })
 
+  await story.update({
+    currentPlayer: key
+  })
+
 })
 
 exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(async (snapshot, ctx) => {
   const uid = ctx.params.uid
   const sid = ctx.params.sid
   const turnData = snapshot.after.val()
-  const num = snapshot.before.val().num
   const name = snapshot.before.val().name
+  const key = snapshot.before.val().key
+  const ptail = snapshot.after.val().ptail
   const story = new Story(sid)
-  const playerOrder = new PlayerOrder(sid)
 
   await story.load()
-  await playerOrder.load()
 
-  const curr = new Player(sid, uid, num)
-  const next = playerOrder.who(num + 1)
-
-  /* Can not modify num */
-  if (turnData.num !== num) {
-    await curr.update({ num: num })
-    return
-  }
+  const curr = new Player(sid, uid, encodeUID(sid, uid))
 
   /* But name can be modify */
   if (name !== turnData.name) {
@@ -75,11 +79,11 @@ exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(as
   }
 
   /* If it is not a play modification, quit */
+  const storyView = story.data.players[key]
   if (
-      story.data.currentPlayer !== num ||
+      story.data.currentPlayer !== key||
       !turnData.played ||
-      story.data.players[num].played ||
-      !playerOrder.who(num)
+      (storyView && storyView.played)
   ) {
     return
   }
@@ -88,17 +92,31 @@ exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(as
 
   await curr.update({
     played: true,
-    myTurn: false
+    myTurn: false,
   })
 
-  if (next) {
-    await next.update({
-      ptail: turnData.tail,
-      myTurn: true
-    })
+  story.data.lastPlayer = curr.publicData.key
+  story.data.rounds.push(curr.publicData.key)
+  await story.save()
+
+  /* Find a new player  TODO*/
+  for (const [key, next] of Object.entries(story.data.players)) {
+    if (!next.played && key !== curr.publicData.key) {
+      const player = new Player(sid, decodeUID(sid, next.key), next.key)
+      await player.update({
+        ptail: ptail,
+        myTurn: true
+      })
+
+      await story.update({
+        currentPlayer: key
+      })
+
+      return
+    }
   }
 
-  await story.update({currentPlayer: num + 1})
+  await story.update({currentPlayer: ''})
 
   return
 })
@@ -117,20 +135,18 @@ export const newStory = functions.https.onRequest((request, response) => {
 
     const story = new Story()
     const sid = story.data.id
-    const playerOrder = new PlayerOrder(sid)
+
+    const adminKey = encodeUID(sid, request.body.uid)
 
     await story.update({
-      currentPlayer: 0
+      admin: adminKey
     }, true)
 
-    const player = new Player(sid, request.body.uid, 0)
+    const player = new Player(sid, request.body.uid, adminKey)
     await player.update({
       id: request.body.uid,
       name: request.body.name,
-      num: 0
     }, true)
-
-    await playerOrder.register(0, request.body.uid)
 
     response.json({
       admin: player.toJSON(),
@@ -152,17 +168,15 @@ export const closeStory = functions.https.onRequest((request, response) => {
     }
 
     const sid = request.body.storyId
-    const playerOrder = new PlayerOrder(sid)
-    await playerOrder.load()
+    const story = new Story(sid)
 
-    const player = playerOrder.who(0)
+    await story.load()
 
-    if (!player || player.privateData.id !== request.body.uid) {
+    if (story.data.admin != encodeUID(sid, request.body.uid)) {
       response.status(403).end()
       return
     }
 
-    const story = new Story(sid)
     await story.finalize()
     response.json({})
     return true
@@ -182,19 +196,13 @@ export const newPlayer = functions.https.onRequest((request, response) => {
     }
 
     const story = new Story(request.body.storyId)
-    const playerOrder = new PlayerOrder(request.body.storyId)
     await story.load()
 
-    const num = story.data.players.length
-
-    const player = new Player(story.data.id, request.body.uid, num)
+    const player = new Player(story.data.id, request.body.uid, encodeUID(story.data.id, request.body.uid))
     await player.update({
       id: request.body.uid,
       name: request.body.name,
-      num: num
     }, true)
-
-    await playerOrder.register(num, player.privateData.id)
 
     response.json(player.toJSON())
   })

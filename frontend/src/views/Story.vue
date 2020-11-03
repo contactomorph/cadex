@@ -1,10 +1,10 @@
 <template>
 <div>
   <h1>L'histoire</h1>
-  <div v-if="player && player.data.num === 0">
+  <div v-if="player && player.data.key === story.data.admin">
     <button @click="closeStory">Terminer l'histoire</button>
   </div>
-  <div v-if="!player || player.data.num !== 0">
+  <div v-else>
     <input type="text" v-model="name" placeholder="ton nom">
     <button @click="join">Rejoindre</button>
   </div>
@@ -12,10 +12,10 @@
 
   <h1>Les joueurs</h1>
 
-  <ul v-for="(p, num) in story.data.players" :key="num">
+  <ul v-for="(p, key) in story.data.players" :key="key">
     <li v-if="p">
-      Joueur #{{num}}: {{ p.name }}
-      <span v-if="player && player.data.num === p.num"> (Moi)</span>
+      {{ p.name }}
+      <span v-if="player && player.data.key === p.key"> (Moi)</span>
     </li>
   </ul>
 
@@ -34,7 +34,7 @@
 </template>
 
 <script lang="ts">
-import Vue from 'vue'
+  import Vue from 'vue'
 import { Story, registerPlayer, closeStory, Player, getUID,  } from '../backend'
 import { ExCadMode, ExCadToken } from "../components/ExCad.vue"
 
@@ -63,35 +63,34 @@ const StoryModule = Vue.extend({
         return []
       const story: Story = this.story
       const player: Player = this.player
-      const tokens = [] as ExCadToken[];
-      const currentPlayerIndex = story.data.currentPlayer
+      const tokens = [] as ExCadToken[]
       const completed = story.data.completed
       const isMyTurn: boolean = player.data.myTurn
-      const myNum: number = player.data.num
-      for(let i = 0; i <= currentPlayerIndex; ++i) {
-        const p = story.data.players[i]
-        if (p) {
-          const isMine = myNum === p.num
-          const isAlmostLast = p.num == currentPlayerIndex - 1
-          const isLast = p.num == currentPlayerIndex
-          const mode: ExCadMode =
-            completed || (!isMyTurn && isMine) ? ExCadMode.Disclosed :
-            !isMyTurn ? ExCadMode.Hidden :
-            isAlmostLast ? ExCadMode.HalfHidden :
-            isLast && isMine ? ExCadMode.ReadyForInput :
-            ExCadMode.Hidden
-          const name: string = p.name ?? "?"
-          const head: string = mode === ExCadMode.Disclosed && !completed ?
-            player.data.head :
-            p.head ?? ""
-          const tail: string = mode === ExCadMode.Disclosed && !completed ?
-            player.data.tail :
-            mode === ExCadMode.HalfHidden ?
-            player.data.ptail :
-            p.tail ?? ""
-          const token = new ExCadToken(name, head, tail, mode)
-          tokens.push(token)
-        }
+      const myKey: string = player.data.key
+      const keys = story.data.rounds.concat([story.data.currentPlayer])
+      for(const k of keys) {
+        const p = story.data.players[k]
+        const isMine = myKey === k
+        const isAlmostLast = k == story.data.lastPlayer
+        const isLast = k == story.data.currentPlayer
+
+        const mode: ExCadMode =
+          completed || (!isMyTurn && isMine) ? ExCadMode.Disclosed :
+          !isMyTurn ? ExCadMode.Hidden :
+          isAlmostLast ? ExCadMode.HalfHidden :
+          isLast && isMine ? ExCadMode.ReadyForInput :
+          ExCadMode.Hidden
+        const name: string = p.name ?? "?"
+        const head: string = mode === ExCadMode.Disclosed && !completed ?
+          player.data.head :
+          p.head ?? ""
+        const tail: string = mode === ExCadMode.Disclosed && !completed ?
+          player.data.tail :
+          mode === ExCadMode.HalfHidden ?
+          player.data.ptail :
+          p.tail ?? ""
+        const token = new ExCadToken(name, head, tail, mode)
+        tokens.push(token)
       }
       return tokens
     }

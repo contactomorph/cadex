@@ -122,7 +122,7 @@ class PlayerPublicData {
   name = ''
   played = false
   myTurn = false
-  num = -1
+  key = ''
   sid = ''
 }
 /**
@@ -132,10 +132,10 @@ class PlayerPublicData {
  * (currently set as uid from firebase anonymous authentication)
  */
 class PlayerPublic extends DBObject<PlayerPublicData> {
-  constructor(sid: string, num: number) {
-    super(FirebaseSDK.DB.ref('stories').child(sid).child('players').child(num.toString()), new PlayerPublicData())
+  constructor(sid: string, key: string) {
+    super(FirebaseSDK.DB.ref('stories').child(sid).child('players').child(key), new PlayerPublicData())
     this.data.sid = sid
-    this.data.num = num
+    this.data.key = key
   }
 }
 
@@ -173,10 +173,10 @@ class Player {
   public readonly publicData: PlayerPublicData
   public readonly privateData: PlayerPrivateData
 
-  constructor(sid: string, uid: string, num: number) {
-    this._public = new PlayerPublic(sid, num)
+  constructor(sid: string, uid: string, key: string) {
+    this._public = new PlayerPublic(sid, key)
     this._private = new PlayerPrivate(sid, uid)
-    this._private.data.num = num
+    this._private.data.key = key
     this.publicData = this._public.data
     this.privateData = this._private.data
   }
@@ -201,62 +201,17 @@ class Player {
   }
 }
 
-interface PlayerOrderData {
-  [key: number]: string;
-}
-/**
- * PlayerOrder objects are a map to retrive the player id
- * from its rank in the story. The structure can be accessed
- * only by admin user
- */
-class PlayerOrder extends DBObject<PlayerOrderData> {
-  private sid: string
-
-  constructor(sid: string) {
-    super(
-      FirebaseSDK.DB.ref('playerMap').child(sid),
-      {} as PlayerOrderData
-    )
-    this.sid = sid
-  }
-
-  /* Override updateData function */
-  protected updateData(data: Partial<PlayerOrderData>): void {
-    Object.assign(this.data, data)
-  }
-
-  /**
-   * Find the player id from its number for a story
-   */
-  public who(num: number): Player|null {
-    const uid = this.data[num]
-    if (uid) {
-      return new Player(this.sid, uid, num)
-    } else {
-      return null
-    }
-  }
-
-  /**
-   * Record a player id with the right number
-   */
-  public async register(num: number, uid: string): Promise<void> {
-    const data = { } as PlayerOrderData
-    data[num] = uid
-
-    await super.update(data)
-  }
-
-}
-
 type U<T> = { [K in keyof T] : T[K] }
 type PlayerStoryData = U<PlayerPublicData & Partial<PlayerPrivateData>>
 
 class StoryData {
   id = ''
   completed = false
-  currentPlayer = 0
-  players = [] as Array<PlayerStoryData>
+  lastPlayer = ''
+  currentPlayer = ''
+  admin = ''
+  players = {} as Record<string, PlayerStoryData>
+  rounds = new Array<string>()
 }
 
 /**
@@ -280,17 +235,15 @@ class Story extends DBObject<StoryData> {
     const privateData = (await FirebaseSDK.DB.ref('players').child(this.data.id).once('value')).val()
 
     const all = Object.values(privateData)
-    const tgt = new Array<PlayerStoryData>(all.length)
+    const tgt = {} as Record<string, PlayerStoryData>
 
     /* do not forget to remove private id of the players */
     for (const player of all) {
       const splayer = player as PlayerPrivateData
       const tplayer = {} as PlayerStoryData
       Object.assign(tplayer, splayer)
-      if (tplayer.num || tplayer.num === 0) {
-        tgt[tplayer.num] = tplayer
-        delete tplayer['id']
-      }
+      delete tplayer['id']
+      tgt[tplayer.key] = tplayer
     }
 
     /* set completed flag to true and copy data */
@@ -305,6 +258,5 @@ export {
   Player as Player,
   PlayerPrivate as PlayerPrivate,
   Story as Story,
-  PlayerOrder as PlayerOrder,
   initializeCadex
 }
