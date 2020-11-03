@@ -35,7 +35,7 @@
 
 <script lang="ts">
   import Vue from 'vue'
-import { Story, registerPlayer, closeStory, Player, getUID,  } from '../backend'
+import { Story, registerPlayer, closeStory, Player, getUID, play } from '../backend'
 import { ExCadMode, ExCadToken } from "../components/ExCad.vue"
 
 const StoryModule = Vue.extend({
@@ -67,11 +67,15 @@ const StoryModule = Vue.extend({
       const completed = story.data.completed
       const isMyTurn: boolean = player.data.myTurn
       const myKey: string = player.data.key
-      const keys = story.data.rounds.concat([story.data.currentPlayer])
+      let keys = story.data.rounds ? story.data.rounds : []
+      const lastPlayer: string = keys[keys.length-1]
+      if (story.data.currentPlayer) {
+        keys = keys.concat([story.data.currentPlayer])
+      }
       for(const k of keys) {
         const p = story.data.players[k]
         const isMine = myKey === k
-        const isAlmostLast = k == story.data.lastPlayer
+        const isAlmostLast = k == lastPlayer
         const isLast = k == story.data.currentPlayer
 
         const mode: ExCadMode =
@@ -102,12 +106,8 @@ const StoryModule = Vue.extend({
       }
       
       const myToken = this.tokens[this.tokens.length - 1]
+      await play(this.story.data.id, myToken.beginning, myToken.ending)
 
-      await this.player.update({
-        played: true,
-        head: myToken.beginning,
-        tail: myToken.ending
-      })
     },
     async join (): Promise<void> {
       if (!this.story || !this.player) {

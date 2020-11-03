@@ -1,209 +1,169 @@
 import * as functions from 'firebase-functions'
-import * as cors from 'cors'
-import { Player, Story, initializeCadex} from 'cadexlib'
+import { Player, PlayerPrivate, Story, StoryData, initializeCadex} from 'cadexlib'
 import * as firebase from 'firebase-admin'
-import * as crypto from 'crypto'
+import { encode, decode, onCorsRequest, onStoryRequest } from './utils'
 
-firebase.initializeApp();
+firebase.initializeApp()
 initializeCadex(firebase.database())
-
-const corswrapper = cors({origin: true})
 
 console.log("Loaded...")
 
-function encodeUID(sid: string, uid: string): string {
-  var cipher = crypto.createCipher('aes-256-cbc', sid + "secretkey")
-  var crypted = cipher.update(uid,'utf8','hex')
-  crypted += cipher.final('hex');
-  return crypted;
-}
 
-function decodeUID(sid: string, key: string): string {
-  var decipher = crypto.createDecipher('aes-256-cbc', sid + "secretkey")
-  var dec = decipher.update(key,'hex','utf8')
-  dec += decipher.final('utf8');
-  return dec;
-}
-
-exports.playerCreated = functions.database.ref('/players/{sid}/{uid}').onCreate(async (snapshot, ctx) => {
-  const uid = ctx.params.uid
-  const sid = ctx.params.sid
-
-  const story = new Story(sid)
-  await story.load()
-
-  if (story.data.currentPlayer !== '') {
-    return
+/**
+ * Manage the story state, find the player, update status
+ * Must be call in an atomic / transaction prevent bad data
+ */
+function updateStoryState(story: StoryData|null): StoryData|null {
+  if (!story) {
+    return story
   }
 
-  const key = encodeUID(sid, uid)
-  const curr = new Player(sid, uid, key)
+  const curr = story.players[story.currentPlayer]
 
-  let ptail = ''
-
-  if (story.data.lastPlayer) {
-    const prevUid = decodeUID(sid, story.data.lastPlayer)
-    const prev = new Player(sid, prevUid, story.data.lastPlayer)
-    await prev.load()
-    ptail = prev.privateData.tail
+  if (story.currentPlayer !== '' && !curr.played) {
+    return story
   }
 
-  /* And update myTurn */
-  await curr.update({
-    ptail: ptail,
-    myTurn: true
-  })
-
-  await story.update({
-    currentPlayer: key
-  })
-
-})
-
-exports.chunkUpdate = functions.database.ref('/players/{sid}/{uid}').onUpdate(async (snapshot, ctx) => {
-  const uid = ctx.params.uid
-  const sid = ctx.params.sid
-  const turnData = snapshot.after.val()
-  const name = snapshot.before.val().name
-  const key = snapshot.before.val().key
-  const ptail = snapshot.after.val().ptail
-  const story = new Story(sid)
-
-  await story.load()
-
-  const curr = new Player(sid, uid, encodeUID(sid, uid))
-
-  /* But name can be modify */
-  if (name !== turnData.name) {
-    await curr.update({ name: turnData.name })
+  /* finalize the turn of the current player */
+  if (curr) {
+    curr.myTurn = false
+    if (!story.rounds) {
+      story.rounds = new Array<string>()
+    }
+    story.rounds.push(curr.key)
+    story.currentPlayer = ''
   }
 
-  /* If it is not a play modification, quit */
-  const storyView = story.data.players[key]
-  if (
-      story.data.currentPlayer !== key||
-      !turnData.played ||
-      (storyView && storyView.played)
-  ) {
-    return
-  }
-
-  // Else update
-
-  await curr.update({
-    played: true,
-    myTurn: false,
-  })
-
-  story.data.lastPlayer = curr.publicData.key
-  story.data.rounds.push(curr.publicData.key)
-  await story.save()
-
-  /* Find a new player  TODO*/
-  for (const [key, next] of Object.entries(story.data.players)) {
-    if (!next.played && key !== curr.publicData.key) {
-      const player = new Player(sid, decodeUID(sid, next.key), next.key)
-      await player.update({
-        ptail: ptail,
-        myTurn: true
-      })
-
-      await story.update({
-        currentPlayer: key
-      })
-
-      return
+  /* find a new available player */
+  for (const [key, next] of Object.entries(story.players)) {
+    if (!next.played) {
+      story.players[key].myTurn = true
+      story.currentPlayer = key
+      story.players[key].continuation = encode(story.id, (curr && curr.tail) ? curr.tail: '')
+      break
     }
   }
 
-  await story.update({currentPlayer: ''})
+  return story
+}
 
+/**
+ * Copy the player state from story state to player private area
+ */
+exports.storyUpdated = functions.database.ref('/stories/{sid}').onUpdate(async (snapshot, ctx) => {
+  const sid = ctx.params.sid
+  const storyData = snapshot.after.val() as StoryData
+
+  if (!storyData.players) {
+    return
+  }
+  for (const [key, playerData] of Object.entries(storyData.players)) {
+    const player = new PlayerPrivate(sid, decode(sid, key))
+    playerData.ptail = playerData.continuation ? decode(sid, playerData.continuation) : ''
+    await player.update(playerData)
+  }
+})
+
+/**
+ * Create a new story and the first player (admin)
+ */
+export const newStory = onCorsRequest(async (request, response) => {
+  if (request.method !== 'POST') {
+    response.status(404).end()
+    return
+  }
+
+  if (!request.body.name || !request.body.uid) {
+    response.status(400).end()
+    return
+  }
+
+  const story = new Story()
+  const sid = story.data.id
+
+  const adminKey = encode(sid, request.body.uid)
+
+  await story.update({
+    admin: adminKey
+  }, true)
+
+  const player = new Player(sid, request.body.uid, adminKey)
+  await player.update({
+    id: request.body.uid,
+    name: request.body.name,
+  }, true)
+
+  await story.atomic(updateStoryState)
+
+  response.json({
+    admin: player.toJSON(),
+    story: story.toJSON()
+  })
+})
+
+/**
+ * Finalize a story (only for the admin)
+ */
+export const closeStory = onStoryRequest(true, async (story, request, response) => {
+  await story.finalize()
+  response.status(204).json({
+    message: "Story closed"
+  })
   return
 })
 
-export const newStory = functions.https.onRequest((request, response) => {
-  corswrapper(request, response, async () => {
-    if (request.method !== 'POST') {
-      response.status(404).end()
-      return
-    }
 
-    if (!request.body.name || !request.body.uid) {
-      response.status(400).end()
-      return
-    }
+/**
+ * Join the story
+ */
+export const newPlayer = onStoryRequest(false, async (story, request, response) => {
 
-    const story = new Story()
-    const sid = story.data.id
-
-    const adminKey = encodeUID(sid, request.body.uid)
-
-    await story.update({
-      admin: adminKey
-    }, true)
-
-    const player = new Player(sid, request.body.uid, adminKey)
-    await player.update({
-      id: request.body.uid,
-      name: request.body.name,
-    }, true)
-
-    response.json({
-      admin: player.toJSON(),
-      story: story.toJSON()
+  if (!request.body.name) {
+    response.status(400).json({
+      message: "name field is missing, you must define a player name"
     })
-  })
+    return
+  }
+
+  const player = new Player(story.data.id, request.body.uid, encode(story.data.id, request.body.uid))
+  await player.update({
+    id: request.body.uid,
+    name: request.body.name,
+  }, true)
+
+  await story.atomic(updateStoryState)
+
+  response.status(200).json(player.toJSON())
 })
 
-export const closeStory = functions.https.onRequest((request, response) => {
-  corswrapper(request, response, async () => {
-    if (request.method !== 'POST') {
-      response.status(404).end()
-      return
-    }
+/**
+ * Play on a story
+ */
+export const play = onStoryRequest(false, async (story, request, response) => {
+  const player = new Player(story.data.id, request.body.uid, encode(story.data.id, request.body.uid))
+  await player.load()
 
-    if (!request.body.storyId || !request.body.uid) {
-      response.status(400).end()
-      return
-    }
+  if (!request.body.head || !request.body.tail) {
+    response.status(400).json({
+      message: "head and tail can not be undefined"
+    })
+    return
+  }
 
-    const sid = request.body.storyId
-    const story = new Story(sid)
+  if (player.publicData.played) {
+    response.status(401).json({
+      message: "player already played"
+    })
+    return
+  }
 
-    await story.load()
-
-    if (story.data.admin != encodeUID(sid, request.body.uid)) {
-      response.status(403).end()
-      return
-    }
-
-    await story.finalize()
-    response.json({})
-    return true
+  await player.update({
+    played: true,
+    head: request.body.head,
+    tail: request.body.tail,
   })
-})
 
-export const newPlayer = functions.https.onRequest((request, response) => {
-  corswrapper(request, response, async () => {
-    if (request.method !== 'POST') {
-      response.status(404).end()
-      return
-    }
+  await story.atomic(updateStoryState)
 
-    if (!request.body.name || !request.body.storyId || !request.body.uid) {
-      response.status(400).end()
-      return
-    }
-
-    const story = new Story(request.body.storyId)
-    await story.load()
-
-    const player = new Player(story.data.id, request.body.uid, encodeUID(story.data.id, request.body.uid))
-    await player.update({
-      id: request.body.uid,
-      name: request.body.name,
-    }, true)
-
-    response.json(player.toJSON())
-  })
+  response.status(200).json({ message: 'ok' })
 })

@@ -28,6 +28,8 @@ interface Reference {
   /* eslint-disable */
   update(values: Object): Promise<any>;
   /* eslint-enable */
+
+  transaction ( transactionUpdate :  ( a :  any ) => any ,  onComplete ? :  ( a :  Error | null ,  b :  boolean ,  c :  DataSnapshot | null ) => any ,  applyLocally ? :  boolean ) : Promise < any >
 }
 
 interface Database {
@@ -68,6 +70,10 @@ class DBObject<T> {
         tgt[key] = src[key]
       }
     }
+  }
+
+  public async atomic(handler: (d: T|null) => T|null) {
+    this.ref.transaction(handler)
   }
 
   public async load() {
@@ -124,6 +130,7 @@ class PlayerPublicData {
   myTurn = false
   key = ''
   sid = ''
+  continuation = ''
 }
 /**
  * This is the public representation for a player
@@ -207,24 +214,29 @@ type PlayerStoryData = U<PlayerPublicData & Partial<PlayerPrivateData>>
 class StoryData {
   id = ''
   completed = false
-  lastPlayer = ''
-  currentPlayer = ''
   admin = ''
   players = {} as Record<string, PlayerStoryData>
-  rounds = new Array<string>()
+  currentPlayer = ''
+  rounds = new Array<string>() // an entry for each player round with player key
 }
 
 /**
  * A Story object is the public data that represents a story
  */
 class Story extends DBObject<StoryData> {
+  public static ROOT = '/stories'
+
   constructor(id?: string) {
     const theid = (id)? id: uuid()
     super(
-      FirebaseSDK.DB.ref('stories').child(theid),
+      FirebaseSDK.DB.ref(Story.ROOT).child(theid),
       new StoryData()
     )
     this.data.id = theid
+  }
+
+  public playersRef(): Reference {
+    return this.ref.child('players')
   }
 
   public async finalize(): Promise<void> {
@@ -257,6 +269,8 @@ class Story extends DBObject<StoryData> {
 export {
   Player as Player,
   PlayerPrivate as PlayerPrivate,
+  PlayerPublic as PlayerPublic,
   Story as Story,
+  StoryData as StoryData,
   initializeCadex
 }
