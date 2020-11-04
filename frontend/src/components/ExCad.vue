@@ -9,28 +9,28 @@
       <tr v-for="row in rows" :key="row.index" :style="row.style">
         <td class="ex_cad_col1">{{ row.token.authorName }}: </td>
         <td class="ex_cad_col2">
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.hidden }">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 0 ? 1.0 : 0.0 }">
             <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
             <span :style="row.fuzzyStyle">{{ row.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.halfHidden }">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 1 ? 1.0 : 0.0 }">
             <span :style="row.fuzzyStyle">{{ row.beginning }}</span>&nbsp;
             <span>{{ row.token.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.disclosed }">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 2 ? 1.0 : 0.0 }">
             <span>{{ row.token.beginning }}&nbsp;{{ row.token.ending }}</span>
           </span>
-          <span class="ex_cad_span" :style="{ opacity: row.opacity.readForInput }">
+          <span class="ex_cad_span" :style="{ opacity: row.token.mode === 3 ? 1.0 : 0.0 }">
             <input
               type="text"
               class="ex_cad_input"
-              :disabled="row.opacity.readForInput < 1"
+              :disabled="row.token.mode !== 3"
               :style="row.style"
               v-model="row.token.beginning">&nbsp;|&nbsp;
             <input
               type="text"
               class="ex_cad_input"
-              :disabled="row.opacity.readForInput < 1"
+              :disabled="row.token.mode !== 3"
               :style="row.style"
               v-model="row.token.ending">
           </span>
@@ -78,6 +78,7 @@
   top: 0;
   right: 0;
   bottom: 0;
+  transition: opacity 0.4s linear;
 }
 .ex_cad_input {
   width: 45%;
@@ -91,7 +92,6 @@
 <script lang="ts">
 import Vue from 'vue'
 import Chroma from 'chroma-js'
-import { UnboundedProgressiveEvent } from '../utils/ProgressiveEvent'
 
 export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
@@ -123,22 +123,6 @@ type ColorSet = {
   readonly contrastiveColor: Chroma.Color;
 }
 
-class ExCadRowOpacity {
-  disclosed: number
-  halfHidden: number
-  hidden: number
-  readForInput: number
-  mode: ExCadMode
-
-  constructor() {
-    this.disclosed = 0
-    this.halfHidden = 0
-    this.hidden = 1.0
-    this.readForInput = 0
-    this.mode = ExCadMode.Hidden
-  }
-}
-
 type ExCadRow = {
   readonly index: number;
   readonly token: ExCadToken;
@@ -146,7 +130,6 @@ type ExCadRow = {
   readonly ending: string;
   readonly style: TextColorStyle;
   readonly fuzzyStyle: TextColorStyle;
-  readonly opacity: ExCadRowOpacity;
 }
 
 const minimalLightness = 0.2
@@ -156,15 +139,6 @@ const distinctColorCount = 7
 const charCodeForA: number = 'a'.charCodeAt(0)
 const spaceProbability = 0.3
 const defaultAlpha = 0.9
-const opacityDelta = 0.1
-
-function increment(opacity: number): number {
-  return Math.min(1.0, opacity + opacityDelta)
-}
-
-function decrement(opacity: number): number {
-  return Math.max(0.0, opacity - opacityDelta)
-}
 
 function generateNiceColor(): Chroma.Color {
   const hue = 360 * Math.random()
@@ -224,18 +198,12 @@ export default Vue.component('ex-cad', {
       type: Array as () => ExCadToken[],
       required: true,
     }
-  },
-  data: function() { return { rowOpacities: [] } },
-  created: function() {
-    const progressing = new UnboundedProgressiveEvent(60, () => this.makeProgress())
-    const self = (this as unknown) as { progressing: UnboundedProgressiveEvent }
-    self.progressing = progressing
-  },
+  }, 
+  data: function() { return {} },
   computed: {
     rows: function(): ExCadRow[] {
       let index = 0
       const rows = [] as ExCadRow[]
-      const rowOpacities = this.rowOpacities as ExCadRowOpacity[]
       for (const token of this.tokens) {
         const set = generatedSets[index]
         const shadowColor = set.contrastiveColor.hex('rgb')
@@ -252,64 +220,11 @@ export default Vue.component('ex-cad', {
         }
         const beginning = generatedTexts[index][0]
         const ending = generatedTexts[index][1]
-        if (rowOpacities.length <= index)
-          rowOpacities.push(new ExCadRowOpacity());
-        const opacity: ExCadRowOpacity = rowOpacities[index]
-        opacity.mode = token.mode
-        const row = { index, token, style, fuzzyStyle, beginning, ending, opacity }
+        const row = { index, token, style, fuzzyStyle, beginning, ending }
         rows.push(row)
         ++index
       }
-      const self = (this as unknown) as { progressing: UnboundedProgressiveEvent }
-      self.progressing.fire()
       return rows
-    }
-  },
-  methods: {
-    makeProgress: function(): boolean {
-      const rowOpacities: ExCadRowOpacity[] = this.rowOpacities
-      let changed = false
-      for (const o of rowOpacities) {
-        switch (o.mode) {
-          case ExCadMode.Hidden:
-            if (o.hidden < 1.0) {
-              o.hidden = increment(o.hidden)
-              o.halfHidden = decrement(o.halfHidden)
-              o.disclosed = decrement(o.disclosed)
-              o.readForInput = decrement(o.readForInput)
-              changed = true
-            }
-            break
-          case ExCadMode.HalfHidden:
-            if (o.halfHidden < 1.0) {
-              o.hidden = decrement(o.hidden)
-              o.halfHidden = increment(o.halfHidden)
-              o.disclosed = decrement(o.disclosed)
-              o.readForInput = decrement(o.readForInput)
-              changed = true
-            }
-            break
-          case ExCadMode.Disclosed:
-            if (o.disclosed < 1.0) {
-              o.hidden = decrement(o.hidden)
-              o.halfHidden = decrement(o.halfHidden)
-              o.disclosed = increment(o.disclosed)
-              o.readForInput = decrement(o.readForInput)
-              changed = true
-            }
-            break
-          case ExCadMode.ReadyForInput:
-            if (o.readForInput < 1.0) {
-              o.hidden = decrement(o.hidden)
-              o.halfHidden = decrement(o.halfHidden)
-              o.disclosed = decrement(o.disclosed)
-              o.readForInput = increment(o.readForInput)
-              changed = true
-            }
-            break
-        }
-      }
-      return changed
     }
   }
 })
