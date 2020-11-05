@@ -67,33 +67,30 @@ const StoryModule = Vue.extend({
       const completed = story.data.completed
       const isMyTurn: boolean = player.data.myTurn
       const myKey: string = player.data.key
-      let keys = story.data.rounds ? story.data.rounds : []
+      let keys = story.data.rounds ?? []
       const lastPlayer: string = keys[keys.length-1]
       if (story.data.currentPlayer) {
         keys = keys.concat([story.data.currentPlayer])
       }
       for(const k of keys) {
         const p = story.data.players[k]
-        const isMine = myKey === k
-        const isAlmostLast = k == lastPlayer
-        const isLast = k == story.data.currentPlayer
 
-        const mode: ExCadMode =
-          completed || (!isMyTurn && isMine) ? ExCadMode.Disclosed :
-          !isMyTurn ? ExCadMode.Hidden :
-          isAlmostLast ? ExCadMode.HalfHidden :
-          isLast && isMine ? ExCadMode.ReadyForInput :
-          ExCadMode.Hidden
-        const name: string = p.name ?? "?"
-        const head: string = mode === ExCadMode.Disclosed && !completed ?
-          player.data.head :
-          p.head ?? ""
-        const tail: string = mode === ExCadMode.Disclosed && !completed ?
-          player.data.tail :
-          mode === ExCadMode.HalfHidden ?
-          player.data.ptail :
-          p.tail ?? ""
-        const token = new ExCadToken(name, head, tail, mode)
+        let token: ExCadToken
+
+        if (completed) {
+          // the game is completed
+          token = new ExCadToken(p.name, p.head, p.tail, ExCadMode.Disclosed)
+        } else if (myKey === k) {
+          // this row is mine
+          const mode = isMyTurn ? ExCadMode.ReadyForInput : ExCadMode.Disclosed
+          token = new ExCadToken(p.name, player.data.head, player.data.tail, mode)
+        } else if(isMyTurn && k === lastPlayer) {
+          // this row is just before me and i'm the current player
+          token = new ExCadToken(p.name, "", player.data.ptail, ExCadMode.HalfHidden)
+        } else {
+          // this row is unrelated to me
+          token = new ExCadToken(p.name)
+        }
         tokens.push(token)
       }
       return tokens

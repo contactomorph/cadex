@@ -25,24 +25,24 @@ function changeMode(token: ExCadToken, mode: ExCadMode): ExCadToken {
 const FirebaseModule2 = Vue.extend({
   data () {
     return {
-      buttonText: "Access",
-      mode: ExCadMode.Disclosed,
+      buttonText: "Show half",
+      mode: ExCadMode.Hidden,
       tokens: [
-        new ExCadToken("Eddy", "C'est joli", "tout ça", ExCadMode.Disclosed),
-        new ExCadToken("Viviane", "mais ça ne", "vaut pas", ExCadMode.Disclosed),
-        new ExCadToken("Aurélien", "la plupart", "des applications", ExCadMode.Disclosed),
-        new ExCadToken("Kiki", "qu'on trouve", "dans le commerce", ExCadMode.Disclosed),
-        new ExCadToken("Lapin", "même si", "beaucoup de gens", ExCadMode.Disclosed),
-        new ExCadToken("Rose", "pense que", "les amanites", ExCadMode.Disclosed),
-        new ExCadToken("George", "phalloïdes", "poussent dans", ExCadMode.Disclosed),
-        new ExCadToken("Fabrice", "de vaste prairies", "où les chevaux", ExCadMode.Disclosed),
+        new ExCadToken("Eddy", "C'est joli", "tout ça"),
+        new ExCadToken("Viviane", "mais ça ne", "vaut pas"),
+        new ExCadToken("Aurélien", "la plupart", "des applications"),
+        new ExCadToken("Kiki", "qu'on trouve", "dans le commerce"),
+        new ExCadToken("Lapin", "même si", "beaucoup de gens"),
+        new ExCadToken("Rose", "pense que", "les amanites"),
+        new ExCadToken("George", "phalloïdes", "poussent dans"),
+        new ExCadToken("Fabrice", "de vaste prairies", "où les chevaux"),
       ],
     }
   },
   methods: {
     plop: function() {
       this.tokens.push(new ExCadToken(
-        "Yienyien", "ma tête", "ma queue", ExCadMode.Disclosed
+        "Yienyien", "ma tête", "ma queue"
       ))
     },
     changeMode: function() {

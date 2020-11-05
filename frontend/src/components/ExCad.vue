@@ -97,15 +97,15 @@ export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
 export class ExCadToken {
   readonly authorName: string
-  readonly mode: ExCadMode
+  mode: ExCadMode
   beginning: string
   ending: string
 
-  constructor(authorName: string, beginning: string, ending: string, mode: ExCadMode) {
-    this.beginning = beginning
-    this.ending = ending
+  constructor(authorName: string, beginning?: string, ending?: string, mode?: ExCadMode) {
     this.authorName = authorName
-    this.mode = mode
+    this.beginning = beginning ?? ""
+    this.ending = ending ?? ""
+    this.mode = mode ?? ExCadMode.Hidden
   }
 }
 
