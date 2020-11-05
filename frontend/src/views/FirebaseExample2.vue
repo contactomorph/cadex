@@ -1,12 +1,15 @@
 <template>
   <div>
     <h1>This is a second firebase integration example</h1>
-    <button type="button" @click="changeMode">{{buttonText}}</button>
     <ex-cad :tokens="tokens"></ex-cad>
     <ul>
-      <li v-for="(token, num) in tokens" :key="num">{{token.beginning}}&nbsp;{{token.ending}}</li>
+      <li v-for="(token, num) in tokens" :key="num">
+        {{token.beginning}}&nbsp;
+        {{token.ending}}&nbsp;
+        <button type="button" @click="changeMode(num)">{{getButtonText(num)}}</button>
+      </li>
     </ul>
-    <button type="buyyon" @click="plop">Plop</button>
+    <button type="button" @click="plop">Plop</button>
   </div>
 </template>
 
@@ -14,19 +17,22 @@
 import Vue from 'vue'
 import ExCad, { ExCadMode, ExCadToken } from "../components/ExCad.vue";
 
-function changeMode(token: ExCadToken, mode: ExCadMode): ExCadToken {
-  return new ExCadToken(
-    token.authorName,
-    token.beginning,
-    token.ending,
-    mode)
+function toButtonText(mode: ExCadMode): string {
+  switch (mode) {
+    case ExCadMode.Hidden:
+      return "Show half";
+    case ExCadMode.HalfHidden:
+      return "Show";
+    case ExCadMode.Disclosed:
+      return "Access";
+    case ExCadMode.ReadyForInput:
+      return "Hide";
+  }
 }
 
 const FirebaseModule2 = Vue.extend({
   data () {
     return {
-      buttonText: "Show half",
-      mode: ExCadMode.Hidden,
       tokens: [
         new ExCadToken("Eddy", "C'est joli", "tout ça"),
         new ExCadToken("Viviane", "mais ça ne", "vaut pas"),
@@ -45,29 +51,27 @@ const FirebaseModule2 = Vue.extend({
         "Yienyien", "ma tête", "ma queue"
       ))
     },
-    changeMode: function() {
-      switch(this.mode) {
+    getButtonText: function(num: number): string {
+      const tokens = this.tokens as ExCadToken[]
+      return toButtonText(tokens[num].mode)
+    },
+    changeMode: function(num: number): void {
+      const tokens = this.tokens as ExCadToken[]
+      const token = tokens[num]
+      switch(token.mode) {
         case ExCadMode.Disclosed:
-          this.mode = ExCadMode.ReadyForInput
-          this.buttonText = "Hide"
+          token.mode = ExCadMode.ReadyForInput
           break
         case ExCadMode.ReadyForInput:
-          this.mode = ExCadMode.Hidden
-          this.buttonText = "Show half"
+          token.mode = ExCadMode.Hidden
           break
         case ExCadMode.Hidden:
-          this.mode = ExCadMode.HalfHidden
-          this.buttonText = "Show all"
+          token.mode = ExCadMode.HalfHidden
           break
         case ExCadMode.HalfHidden:
-          this.mode = ExCadMode.Disclosed
-          this.buttonText = "Access"
+          token.mode = ExCadMode.Disclosed
           break
       }
-      const newTokens = [] as ExCadToken[]
-      for (const token of this.tokens as ExCadToken[])
-        newTokens.push(changeMode(token, this.mode))
-      this.tokens = newTokens
     }
   },
   components: {
