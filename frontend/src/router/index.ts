@@ -4,7 +4,7 @@ import Home from '../views/Home.vue'
 import Firebase from '../views/FirebaseExample.vue'
 import Stories from '../views/Stories.vue'
 import Story from '../views/Story.vue'
-import Firebase2 from '../views/FirebaseExample2.vue'
+import Demo from '../views/Demo.vue'
 Vue.use(VueRouter)
 
 const routes: Array<RouteConfig> = [
@@ -37,9 +37,9 @@ const routes: Array<RouteConfig> = [
     component: Story
   },
   {
-    path: '/firebase2',
-    name: 'Firebase2',
-    component: Firebase2
+    path: '/demo',
+    name: 'Demo',
+    component: Demo
   },
 ]
 

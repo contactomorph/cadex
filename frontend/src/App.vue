@@ -5,7 +5,7 @@
       <router-link to="/about">About</router-link> |
       <router-link to="/firebase">Firebase</router-link> |
       <router-link to="/stories">Story</router-link> |
-      <router-link to="/firebase2">Example 2</router-link>
+      <router-link to="/demo">Components demo</router-link>
     </div>
     <router-view/>
   </div>
