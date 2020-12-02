@@ -1,35 +1,56 @@
 <template>
 <div>
-  <h1>L'histoire</h1>
-  <div v-if="player && player.data.key === story.data.admin">
-    <button @click="closeStory">Terminer l'histoire</button>
+  <div class="row">
+    <div class="col">
+      <h2>Listes des joueurs</h2>
+
+      <ul v-for="(p, key) in story.data.players" :key="key" class="list-group">
+        <li v-if="p" class="list-group-item">
+          {{ p.name }}
+          <span v-if="player && player.data.key === p.key"> (Moi)</span>
+        </li>
+      </ul>
+    </div>
+
+
+
+    <div class="col">
+      <h2>Actions</h2>
+      <div v-if="player && player.data.key === story.data.admin">
+        <button @click="closeStory" class="btn btn-primary">Terminer l'histoire</button>
+      </div>
+      <div v-else class="row form-group">
+        <div class="col-8">
+          <input type="text" v-model="name" class="form-control" placeholder="ton nom">
+        </div>
+        <div class="col-4">
+          <button @click="join" class="btn btn-primary">Rejoindre</button>
+        </div>
+      </div>
+      <p v-if="story && story.data.completed" class="alert alert-primary" >Histoire terminée</p>
+      <p v-if="player && !player.exists" class="alert alert-primary" >Je n'ai pas encore de nom</p>
+    </div>
   </div>
-  <div v-else>
-    <input type="text" v-model="name" placeholder="ton nom">
-    <button @click="join">Rejoindre</button>
+
+  <div class="row mt-5">
+    <div v-if="story && player" class="col-4">
+      <div class="alert alert-primary">
+        <span v-if="story.data.completed">C'est terminé</span>
+        <span v-else-if="player.data.myTurn">A moi de jouer !</span>
+        <span v-else>Ce n'est pas mon tour</span>
+      </div>
+    </div>
   </div>
-  <p v-if="story && story.data.completed">Histoire terminée</p>
-
-  <h1>Les joueurs</h1>
-
-  <ul v-for="(p, key) in story.data.players" :key="key">
-    <li v-if="p">
-      {{ p.name }}
-      <span v-if="player && player.data.key === p.key"> (Moi)</span>
-    </li>
-  </ul>
-
-  <p v-if="player && !player.exists">Je n'ai pas encore de nom</p>
-
-  <h1>Le jeu</h1>
-  
-  <template v-if="story && player">
-    <ex-cad :tokens="tokens"></ex-cad>
-    <p v-if="story.data.completed">C'est terminé</p>
-    <p v-else-if="player.data.myTurn">A moi de jouer ! <button @click="play">Play</button></p>
-    <p v-else>Ce n'est pas mon tour</p>
-  </template>
-
+  <div class="row">
+    <div class="col">
+      <ex-cad :tokens="tokens"></ex-cad>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-4">
+      <p v-if="player.data.myTurn"><button class="btn btn-primary" @click="play">Jouer</button></p>
+    </div>
+  </div>
 </div>
 </template>
 

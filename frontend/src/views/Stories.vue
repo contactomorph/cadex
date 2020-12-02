@@ -1,14 +1,19 @@
 <template>
-  <div>
-    <h1>Créer un nouvelle histoire</h1>
-    <div>
-      <input v-model="adminName"  type="text" placeholder="nom">
-      <button @click="newStory">Créer</button>
-      <div>
-        <a :href="storyUrl">Lien vers l'histoire</a>
-      </div>
+<div>
+  <div class="row">
+    <div class="col">
+      <h2>Créer une nouvelle histoire</h2>
     </div>
   </div>
+  <div class="row">
+    <div class="col-3 form-group">
+      <input v-model="adminName"  class="form-control" type="text" placeholder="votre nom">
+    </div>
+    <div class="col-1">
+      <button @click="newStory" class="btn btn-primary">Créer</button>
+    </div>
+  </div>
+</div>
 </template>
 
 <script lang="ts">
@@ -26,7 +31,12 @@ const StoryModule = Vue.extend({
   methods: {
     newStory () {
       nstory(this.adminName).then((story) => {
-        this.storyUrl = "/stories/"+story.data.id
+        this.$router.push({
+          name: "Story",
+          params: {
+            storyId: story.data.id
+          }
+        })
       })
     }
   }
