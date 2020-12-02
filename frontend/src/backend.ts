@@ -1,7 +1,6 @@
-import * as firebase from 'firebase/app'
+import firebase from 'firebase/app'
 import 'firebase/database'
 import 'firebase/auth'
-//import * as crypto from 'crypto'
 import axios from 'axios'
 import { PlayerPrivate, Story, initializeCadex } from 'cadexlib'
 
@@ -73,13 +72,13 @@ function initialize() {
 
   initializeCadex(firebase.database())
 
-  firebase.auth().onAuthStateChanged(function(user) {
+  firebase.app().auth().onAuthStateChanged(function(user) {
     if (user) {
       uid.trigger(user.uid)
     }
   })
 
-  firebase.auth().signInAnonymously().catch(() => {
+  firebase.app().auth().signInAnonymously().catch(() => {
     return
   })
 }
