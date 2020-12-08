@@ -132,15 +132,11 @@ const Demo = Vue.extend({
       }
     },
     clickplus(rtoken: RegistrationToken): void {
-      if (rtoken.mode === RegistrationMode.Locked)
+      if (rtoken.mode === RegistrationMode.Recorded)
         rtoken.mode = RegistrationMode.ReadyForModifying
       else
-        rtoken.mode = RegistrationMode.Locked
+        rtoken.mode = RegistrationMode.Recorded
     },
-  },
-  components: {
-    ExCad,
-    Registration,
   },
 })
 

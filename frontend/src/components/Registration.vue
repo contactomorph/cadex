@@ -30,8 +30,9 @@
             <input
               type="button"
               class="registr_button"
-              :value="'\u2B21 \u2B15 \u2B24'"
-              :style="row.buttonStyle">
+              :value="'\u{1F308}'"
+              :style="row.buttonStyle"
+              @click="openPicker(row)">
           </span>
         </td>
         <td class="registr_col1">
@@ -46,6 +47,12 @@
         </td>
       </tr>
     </table>
+    <Picker
+      :visible="pickerVisible"
+      :color="pickerColor"
+      @accept="pickColor"
+      @cancel="pickColor">
+    </Picker>
   </div>
 </template>
 
@@ -109,8 +116,9 @@
 </style>
 
 <script lang="ts">
-import Vue from 'vue'
+import Vue, { PropType } from 'vue'
 import Chroma, { Color } from 'chroma-js'
+import Picker from './Picker.vue'
 
 export enum RegistrationMode { Recorded, ReadyForModifying, ReadyForAdding, Locked }
 
@@ -148,17 +156,38 @@ type RegistrationRow = {
 }
 
 export default Vue.component('registration', {
+  components: { Picker },
   props: {
     tokens: {
       type: Array as () => RegistrationToken[],
       required: true,
     },
     clickplus: {
-      type: Object as () => ((row: RegistrationToken, num: number) => void),
+      type: Function as PropType<((row: RegistrationToken, num: number) => void)>,
       required: true,
     },
   }, 
-  data: function() { return {} },
+  data: function() {
+    return {
+      pickerVisible: false,
+      pickerColor: Chroma.rgb(255, 0, 0),
+      selectedRow: null as RegistrationRow | null
+    }
+  },
+  methods: {
+    openPicker: function(row: RegistrationRow) {
+      this.selectedRow = row
+      this.pickerColor = row.token.color
+      this.pickerVisible = true
+    },
+    pickColor: function(c: Color|undefined) {
+      if (this.selectedRow && c) {
+        this.selectedRow.token.color = c
+      }
+      this.selectedRow = null
+      this.pickerVisible = false
+    },
+  },
   computed: {
     rows: function(): RegistrationRow[] {
       let index = 0
@@ -187,6 +216,6 @@ export default Vue.component('registration', {
       }
       return rows
     },
-  }
+  },
 })
 </script>
