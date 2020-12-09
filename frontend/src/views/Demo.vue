@@ -138,6 +138,7 @@ const Demo = Vue.extend({
         rtoken.mode = RegistrationMode.Recorded
     },
   },
+  components: { ExCad, Registration },
 })
 
 export default Demo
