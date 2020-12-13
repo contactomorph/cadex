@@ -129,7 +129,7 @@ export default Vue.component('color-locator-2d', {
         case 'b': return [blueChar, greenChar, redChar]
         case 'h': return [hueChar, satChar, lightChar]
         case 's': return [satChar, lightChar, hueChar]
-        case 'l': return [lightChar, hueChar, satChar]
+        case 'l': return [lightChar, satChar, hueChar]
         default:
           throw new Error(`Unknown model: ${this.model}`)
       }
