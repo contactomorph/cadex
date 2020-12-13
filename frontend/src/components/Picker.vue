@@ -30,7 +30,11 @@
             </ul>
           </div>
           <div class='vc-color2d'>
-            <ColorLocator2d :color='currColor' :model='currModel' @change='handleColorChange'></ColorLocator2d>
+            <ColorLocator2d
+              :value='innerColor'
+              :model='currModel'
+              @input='handleColorChange'>
+            </ColorLocator2d>
           </div>
           <div class='vc-buttons'>
             <button class='vc-buttons-accept' @click='handleAccept'>&#x2713;</button>
@@ -57,6 +61,9 @@ export default Vue.component('picker', {
     },
     model: {
       type: String as PropType<Model>,
+      validator: function(m: Model): boolean {
+        return ['r','g','b','h','s','l'].indexOf(m) > -1
+      },
       default: 'r',
     },
     visible: {
@@ -67,7 +74,8 @@ export default Vue.component('picker', {
   data () {
     return {
       currVisible: false,
-      currColor: Chroma.rgb(0, 0, 0),
+      outerColor: Chroma.rgb(0, 0, 0),
+      innerColor: Chroma.rgb(0, 0, 0),
       currModel: 'r' as Model,
     }
   },
@@ -75,18 +83,15 @@ export default Vue.component('picker', {
     handleModelChange: function(newModel: Model): void {
       if (newModel !== this.currModel) {
         this.currModel = newModel
+        this.innerColor = this.outerColor
       }
     },
     handleColorChange: function(newColor: Color): void {
-      const n = newColor.hex()
-      const c = this.currColor.hex()
-      if (c !== n) {
-        this.currColor = newColor
-      }
+      this.outerColor = newColor
     },
     handleAccept: function(): void {
       this.currVisible = false
-      this.$emit('accept', this.currColor)
+      this.$emit('accept', this.outerColor)
     },
     handleCancel: function(): void {
       this.currVisible = false
@@ -95,7 +100,8 @@ export default Vue.component('picker', {
   },
   watch: {
     color: function(c: Color): void {
-      this.currColor = c
+      this.outerColor = c
+      this.innerColor = c
     },
     model: function(m: Model): void {
       this.currModel = m
@@ -105,7 +111,8 @@ export default Vue.component('picker', {
     }
   },
   beforeMount: function(): void {
-    this.currColor = this.color
+    this.outerColor = this.color
+    this.innerColor = this.color
   }
 })
 
@@ -114,7 +121,6 @@ export default Vue.component('picker', {
 <style scoped>
 .vc-color-picker {
   display: inline-block;
-  height: 0;
 }
 .vc-container {
   position: fixed;

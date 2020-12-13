@@ -1,18 +1,24 @@
 <template>
   <Locator2d 
-    :locationX='location.xRatio'
-    :locationY='location.yRatio'
-    :spaceStyle='spaceStyle'
-    :barStyle='barStyle'
-    :pointerStyle='pointerStyle'
-    @change='handleColorChange'
+    :value='position'
+    :characters='characters'
+    @input='handlePositionChange'
+    :spaceStyle='styles.space'
+    :barStyle='styles.bar'
+    :pointerStyle='styles.pointer'
   ></Locator2d>
 </template>
 
 <script lang="ts">
-import Locator2d, { RatioPosition, BackgroundStyle } from './Locator2d.vue'
+import Locator2d, { UnitPosition, BackgroundStyle, ColoredChar } from './Locator2d.vue'
 import Vue, { PropType } from 'vue'
 import Chroma, { Color } from 'chroma-js'
+
+export type LocatorStyle = {
+  space: BackgroundStyle;
+  bar: BackgroundStyle;
+  pointer: BackgroundStyle;
+}
 
 export type Model = 'r' | 'g' | 'b' | 'h' | 's' | 'l'
 
@@ -29,10 +35,72 @@ function createLeftRightHueGradient(s: number, l: number): string {
     `hsl(0,${sp}%,${lp}%) 100%)`
 }
 
+function toPosition(color: Color, model: Model): UnitPosition {
+  switch (model) {
+    case 'r': {
+      const [r, g, b] = color.rgb()
+      return new UnitPosition(g / 255, 1 - b / 255, r / 255)
+    }
+    case 'g': {
+      const [r, g, b] = color.rgb()
+      return new UnitPosition(b / 255, 1 - r / 255, g / 255)
+    }
+    case 'b': {
+      const [r, g, b] = color.rgb()
+      return new UnitPosition(r / 255, 1 - g / 255, b / 255)
+    }
+    case 'h': {
+      const [h, s, l] = color.hsl()
+      return new UnitPosition(l, 1 - s, h / 360)
+    }
+    case 's':{
+      const [h, s, l] = color.hsl()
+      return new UnitPosition(h / 360, 1 - l, s)
+    }
+    case 'l':{
+      const [h, s, l] = color.hsl()
+      return new UnitPosition(h / 360, 1 - s, l)
+    }
+  }
+  throw new Error("Unreachable")
+}
+
+function toColor(p: UnitPosition, model: Model): Color {
+  switch (model as Model) {
+    case 'r': {
+      return Chroma.rgb(255 * p.z, p.x * 255, 255 - p.y * 255)
+    }
+    case 'g': {
+      return Chroma.rgb(255 - p.y * 255, 255 * p.z, p.x * 255)
+    }
+    case 'b': {
+      return Chroma.rgb(p.x * 255, 255 - p.y * 255, p.z * 255)
+    }
+    case 'h': {
+      return Chroma.hsl(p.z * 360, 1 - p.y, p.x)
+    }
+    case 's': {
+      return Chroma.hsl(p.x * 360, p.z, 1 - p.y)
+    }
+    case 'l': {
+      return Chroma.hsl(p.x * 360, 1 - p.y, p.z)
+    }
+  }
+  throw new Error("Unreachable")
+}
+
+const redChar = { character: "\u2B24", color: "#f00", }
+const greenChar = { character: "\u2B24", color: "#0f0", }
+const blueChar = { character: "\u2B24", color: "#00f", }
+const hueChar = { character: "\u{1F308}", color: "#000", }
+const satChar = { character: "\u{1F317}", color: "#000", }
+const lightChar = { character: "\u{1F4A1}", color: "#000", }
+
+
 export default Vue.component('color-locator-2d', {
   components: { Locator2d },
   props: {
-    color: {
+    value: {
       type: Object as PropType<Color>,
       validator: function(c: Color): boolean {
         return c.darken !== undefined && c.brighten !== undefined
@@ -47,162 +115,109 @@ export default Vue.component('color-locator-2d', {
       default: 'r'
     },
   },
-  data: function() { return {} },
+  data: function() {
+    return {
+      position: UnitPosition.ZERO,
+      color: Chroma.rgb(0, 0, 0),
+    }
+  },
   computed: {
-    spaceStyle: function(): BackgroundStyle {
+    characters: function(): [ColoredChar, ColoredChar, ColoredChar] {
+      switch (this.model as Model) {
+        case 'r': return [redChar, blueChar, greenChar]
+        case 'g': return [greenChar, redChar, blueChar]
+        case 'b': return [blueChar, greenChar, redChar]
+        case 'h': return [hueChar, satChar, lightChar]
+        case 's': return [satChar, lightChar, hueChar]
+        case 'l': return [lightChar, hueChar, satChar]
+        default:
+          throw new Error(`Unknown model: ${this.model}`)
+      }
+    },
+    styles: function(): LocatorStyle {
       const color = this.color as Color
-      let background: string
+      let sb: string, bb: string
       switch (this.model as Model) {
         case 'r': {
-          const r = color.rgb()[0]
-          background = `linear-gradient(to top right, rgb(${r},0,0), transparent, rgb(${r},255,255)), ` +
-            `linear-gradient(to bottom right, rgb(${r},255,0), rgb(${r},0,255))`
+          const [r, g, b] = color.rgb()
+          sb = `linear-gradient(to top right, rgb(${r},0,0), transparent, rgb(${r},255,255)), ` +
+            `linear-gradient(to bottom right, rgb(${r},0,255), rgb(${r},255,0))`
+          bb = `linear-gradient(to right, rgb(0,${g},${b}), rgb(255,${g},${b}) )`
           break
         }
         case 'g': {
-          const g = color.rgb()[1]
-          background = `linear-gradient(to top right, rgb(0,${g},0), transparent, rgb(255,${g},255)), ` +
+          const [r, g, b] = color.rgb()
+          sb = `linear-gradient(to top right, rgb(0,${g},0), transparent, rgb(255,${g},255)), ` +
             `linear-gradient(to bottom right, rgb(255,${g},0), rgb(0,${g},255))`
+          bb = `linear-gradient(to right, rgb(${r},0,${b}), rgb(${r},255,${b}))`
           break
         }
         case 'b': {
-          const b = color.rgb()[2]
-          background = `linear-gradient(to top right, rgb(0,0,${b}), transparent, rgb(255,255,${b})), ` +
+          const [r, g, b] = color.rgb()
+          sb = `linear-gradient(to top right, rgb(0,0,${b}), transparent, rgb(255,255,${b})), ` +
             `linear-gradient(to bottom right, rgb(0,255,${b}), rgb(255,0,${b}))`
+          bb = `linear-gradient(to right, rgb(${r},${g},0), rgb(${r},${g},255))`
           break
         }
         case 'h': {
-          const h = color.hsl()[0]
-          background =  `linear-gradient(to right, #000, transparent, #fff), ` +
+          const [h, s, l] = color.hsl()
+          sb =  `linear-gradient(to right, #000, transparent, #fff), ` +
             `linear-gradient(to top, #888, hsl(${h},100%,50%))`
+          bb = createLeftRightHueGradient(s, l)
           break
         }
         case 's': {
-          const s = color.hsl()[1]
-          background = `linear-gradient(to top, #000, transparent, #fff), ` +
-            createLeftRightHueGradient(s, 0.5)
-          break
-        }
-        case 'l': {
-          const l = color.hsl()[2]
-          background = `linear-gradient(to top, #888, transparent),` +
-            createLeftRightHueGradient(1, l)
-          break
-        }
-      }
-      return { background }
-    },
-    barStyle: function(): BackgroundStyle {
-      const color = this.color as Color
-      let background: string
-      switch (this.model as Model) {
-        case 'r': {
-          const [, g, b] = color.rgb()
-          background = `linear-gradient(to right, rgb(0,${g},${b}), rgb(255,${g},${b}) )`
-          break
-        }
-        case 'g': {
-          const [r, , b] = color.rgb()
-          background = `linear-gradient(to right, rgb(${r},0,${b}), rgb(${r},255,${b}))`
-          break
-        }
-        case 'b': {
-          const [r, g, ] = color.rgb()
-          background = `linear-gradient(to right, rgb(${r},${g},0), rgb(${r},${g},255))`
-          break
-        }
-        case 'h': {
-          const [, s, l] = color.hsl()
-          background = createLeftRightHueGradient(s, l)
-          break
-        }
-        case 's': {
-          const [h, , l] = color.hsl()
+          const [h, s, l] = color.hsl()
           const lp = Math.round(100 * l)
-          background = `linear-gradient(to right, #888, hsl(${h},100%,${lp}%))`
+          sb = `linear-gradient(to top, #000, transparent, #fff), ` +
+            createLeftRightHueGradient(s, 0.5)
+          bb = `linear-gradient(to right, hsl(${h},0%,${lp}%), hsl(${h},100%,${lp}%))`
           break
         }
         case 'l': {
-          const [h, s, ] = color.hsl()
+          const [h, s, l] = color.hsl()
           const sp = Math.round(100 * s)
-          background = `linear-gradient(to right, #000, hsl(${h},${sp}%,50%), #fff)`
+          sb = `linear-gradient(to top, #888, transparent),` +
+            createLeftRightHueGradient(1, l)
+          bb = `linear-gradient(to right, #000, hsl(${h},${sp}%,50%), #fff)`
           break
         }
+        default:
+          throw new Error(`Unknown model: ${this.model}`)
       }
-      return { background }
-    },
-    pointerStyle: function(): BackgroundStyle {
-      return { background: this.color.hex() }
-    },
-    location: function(): RatioPosition {
-      const color = this.color as Color
-      switch (this.model as Model) {
-        case 'r': {
-          const [, g, b] = color.rgb()
-          return { xRatio: b / 255, yRatio: 1 - g / 255 }
-        }
-        case 'g': {
-          const [r, , b] = color.rgb()
-          return { xRatio: b / 255, yRatio: 1 - r / 255 }
-        }
-        case 'b': {
-          const [r, g, ] = color.rgb()
-          return { xRatio: r / 255, yRatio: 1 - g / 255 }
-        }
-        case 'h': {
-          const [, s, l] = color.hsl()
-          return { xRatio: l, yRatio: 1 - s }
-        }
-        case 's':{
-          const [h, , l] = color.hsl()
-          return { xRatio: h / 360, yRatio: 1 - l }
-        }
-        case 'l':{
-          const [h, s, ] = color.hsl()
-          return { xRatio: h / 360, yRatio: 1 - s }
-        }
+      return {
+        space: { background: sb },
+        bar: { background: bb },
+        pointer: { background: color.hex() },
       }
-      throw new Error("Unreachable")
     },
   },
   methods: {
-    handleColorChange: function(p: RatioPosition): void {
-      const color = this.color as Color
-      let projectedColor: Color
-      switch (this.model as Model) {
-        case 'r': {
-          const r = color.rgb()[0]
-          projectedColor = Chroma.rgb(r, 255 - p.yRatio * 255, p.xRatio * 255)
-          break
-        }
-        case 'g': {
-          const g = color.rgb()[1]
-          projectedColor = Chroma.rgb(255 - p.yRatio * 255, g, p.xRatio * 255)
-          break
-        }
-        case 'b': {
-          const b = color.rgb()[2]
-          projectedColor = Chroma.rgb(p.xRatio * 255, 255 - p.yRatio * 255, b)
-          break
-        }
-        case 'h': {
-          const h = color.hsl()[0]
-          projectedColor = Chroma.hsl(h, 1 - p.yRatio, p.xRatio)
-          break
-        }
-        case 's': {
-          const s = color.hsl()[1]
-          projectedColor = Chroma.hsl(p.xRatio * 360, s, 1 - p.yRatio)
-          break
-        }
-        case 'l': {
-          const l = color.hsl()[2]
-          projectedColor = Chroma.hsl(p.xRatio * 360, 1 - p.yRatio, l)
-          break
+    handlePositionChange: function(p: UnitPosition): void {
+      if (!p.equals(this.position)) {
+        this.position = p
+        const c = toColor(p, this.model as Model)
+        if (this.color.num() !== c.num()) {
+          this.color = c
+          this.$emit('input', c)
         }
       }
-      this.$emit('change', projectedColor)
     },
+  },
+  watch: {
+    value: function(c: Color): void {
+      if (c.num() !== this.color.num()) {
+        this.color = c
+        this.position = toPosition(c, this.model as Model)
+      }
+    },
+    model: function(m: Model): void {
+      this.position = toPosition(this.color, m as Model)
+    },
+  },
+  beforeMount: function(): void {
+    this.color = this.value
+    this.position = toPosition(this.value, this.model as Model)
   },
 })
 
