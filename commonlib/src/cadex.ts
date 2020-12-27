@@ -131,6 +131,7 @@ class PlayerPublicData {
   key = ''
   sid = ''
   continuation = ''
+  color = ''
 }
 /**
  * This is the public representation for a player

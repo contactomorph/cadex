@@ -96,10 +96,11 @@ async function jsonPOST<T>(func: string, data: T) {
 /**
  * Create a new story
  */
-async function newStory(name: string) {
+async function newStory(name: string, color?: string) {
   const uid = await getUID()
   const resp = await jsonPOST('newStory', {
     name: name,
+    color: color,
     uid: uid
   })
 
@@ -115,7 +116,8 @@ async function registerPlayer(player: PlayerPrivate) {
   await jsonPOST('newPlayer', {
     uid: uid,
     storyId: player.data.sid,
-    name: player.data.name
+    name: player.data.name,
+    color: player.data.color,
   })
   return player
 }
@@ -140,6 +142,27 @@ async function play(storyId: string, head: string, tail: string) {
   return true
 }
 
+interface SettableProperties {
+  name?: string;
+  color?: string;
+}
+
+async function updatePlayer(storyId: string, properties: SettableProperties) {
+  const uid = await getUID()
+  const data = {
+    uid: uid,
+    storyId: storyId,
+    name: properties.name,
+    color: properties.color,
+  }
+  console.log(properties)
+  if (properties.name || properties.color) {
+
+    await jsonPOST('updatePlayer', data)
+  }
+  return true
+}
+
 export {
   initialize,
   Story as Story,
@@ -148,5 +171,6 @@ export {
   closeStory,
   play,
   registerPlayer,
-  getUID
+  getUID,
+  updatePlayer,
 }

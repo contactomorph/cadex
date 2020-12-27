@@ -96,6 +96,7 @@ export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
 export class ExCadToken {
   readonly authorName: string
+  mainColor: Chroma.Color | null
   mode: ExCadMode
   beginning: string
   ending: string
@@ -105,6 +106,11 @@ export class ExCadToken {
     this.beginning = beginning ?? ""
     this.ending = ending ?? ""
     this.mode = mode ?? ExCadMode.Hidden
+    this.mainColor = null
+  }
+
+  setColor(color: string) {
+    this.mainColor = color ? Chroma(color) : null
   }
 }
 
@@ -145,6 +151,16 @@ function generateNiceColor(): Chroma.Color {
   return Chroma.hsl(hue, 1.0, lightness)
 }
 
+function generateColorSet(mainColor: Chroma.Color): ColorSet {
+  const mainColorIsLight = mainColor.lch()[0] > 75.0
+  const blackAndWhiteColor = mainColorIsLight ? Chroma('black') : Chroma('white')
+  const contrastiveColor = mainColorIsLight ? mainColor.brighten(1.5) : mainColor.darken(2.5)
+  const hsl = mainColor.hsl()
+  const paleColor = Chroma.hsl(hsl[0], hsl[1], hsl[2] * 0.90)
+  const palerColor = Chroma.hsl(hsl[0], hsl[1], hsl[2] * 0.95)
+  return { mainColor, paleColor, palerColor, blackAndWhiteColor, contrastiveColor, }
+}
+
 function generateColorSets(count: number): ColorSet[] {
   const colorSets = Array(count).fill(null) as ColorSet[]
   let i = 0;
@@ -159,13 +175,7 @@ function generateColorSets(count: number): ColorSet[] {
     }
     if (!distinctEnough)
       continue
-    const mainColorIsLight = mainColor.lch()[0] > 75.0
-    const blackAndWhiteColor = mainColorIsLight ? Chroma('black') : Chroma('white')
-    const contrastiveColor = mainColorIsLight ? mainColor.brighten(1.5) : mainColor.darken(2.5)
-    const hsl = mainColor.hsl()
-    const paleColor = Chroma.hsl(hsl[0], hsl[1], hsl[2] * 0.90)
-    const palerColor = Chroma.hsl(hsl[0], hsl[1], hsl[2] * 0.95)
-    colorSets[i] = { mainColor, paleColor, palerColor, blackAndWhiteColor, contrastiveColor, }
+    colorSets[i] = generateColorSet(mainColor)
     ++i
   }
   return colorSets
@@ -197,14 +207,14 @@ export default Vue.component('ex-cad', {
       type: Array as () => ExCadToken[],
       required: true,
     }
-  }, 
+  },
   data: function() { return {} },
   computed: {
     rows: function(): ExCadRow[] {
       let index = 0
       const rows = [] as ExCadRow[]
       for (const token of this.tokens) {
-        const set = generatedSets[index]
+        const set = (token.mainColor)? generateColorSet(token.mainColor): generatedSets[index]
         const shadowColor = set.contrastiveColor.hex('rgb')
         const style = {
           backgroundColor: set.mainColor.hex('rgba'),

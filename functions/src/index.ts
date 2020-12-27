@@ -91,6 +91,7 @@ export const newStory = onCorsRequest(async (request, response) => {
   await player.update({
     id: request.body.uid,
     name: request.body.name,
+    color: request.body.color,
   }, true)
 
   await story.atomic(updateStoryState)
@@ -129,6 +130,7 @@ export const newPlayer = onStoryRequest(false, async (story, request, response) 
   await player.update({
     id: request.body.uid,
     name: request.body.name,
+    color: request.body.color,
   }, true)
 
   await story.atomic(updateStoryState)
@@ -164,6 +166,34 @@ export const play = onStoryRequest(false, async (story, request, response) => {
   })
 
   await story.atomic(updateStoryState)
+
+  response.status(200).json({ message: 'ok' })
+})
+
+/**
+ * Update player settable properties
+ */
+
+interface SettableProps {
+  name?: string;
+  color?: string;
+}
+
+export const updatePlayer = onStoryRequest(false, async(story, request, response) => {
+  const player = new Player(story.data.id, request.body.uid, encode(story.data.id, request.body.uid))
+  await player.load()
+
+  const data:SettableProps = {}
+
+  if(request.body.name) {
+    data.name = request.body.name
+  }
+
+  if(request.body.color) {
+    data.color = request.body.color
+  }
+
+  await player.update(data)
 
   response.status(200).json({ message: 'ok' })
 })

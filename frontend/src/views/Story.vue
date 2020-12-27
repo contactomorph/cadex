@@ -7,12 +7,14 @@
       <ul v-for="(p, key) in story.data.players" :key="key" class="list-group">
         <li v-if="p" class="list-group-item">
           {{ p.name }}
-          <span v-if="player && player.data.key === p.key"> (Moi)</span>
+          <span v-if="player && player.data.key === p.key"> (Moi)
+            <span v-for="color of colors" :key="color" >
+              <i class="bi bi-bookmark-fill" :style="{color: color}" v-on:click="setColor(color)"></i>
+            </span>
+          </span>
         </li>
       </ul>
     </div>
-
-
 
     <div class="col-4">
       <h2>Actions</h2>
@@ -56,7 +58,7 @@
 
 <script lang="ts">
   import Vue from 'vue'
-import { Story, registerPlayer, closeStory, Player, getUID, play } from '../backend'
+import { Story, registerPlayer, closeStory, Player, getUID, play, updatePlayer} from '../backend'
 import { ExCadMode, ExCadToken } from "../components/ExCad.vue"
 
 const StoryModule = Vue.extend({
@@ -68,6 +70,16 @@ const StoryModule = Vue.extend({
       myTurn: false,
       text: '',
       baduid: '',
+      colors: [
+        "Navy",
+        "FireBrick",
+        "Gold",
+        "Black",
+        "Green",
+        "BlueViolet",
+        "DarkGoldenRod",
+        "Silver",
+      ]
     }
   },
   created () {
@@ -112,6 +124,7 @@ const StoryModule = Vue.extend({
           // this row is unrelated to me
           token = new ExCadToken(p.name)
         }
+        token.setColor(p.color)
         tokens.push(token)
       }
       return tokens
@@ -143,6 +156,9 @@ const StoryModule = Vue.extend({
         player.data.name = this.name
         await registerPlayer(player)
       }
+    },
+    async setColor(color: string) {
+      updatePlayer(this.story.data.id, {color})
     },
     async closeStory (): Promise<void> {
       closeStory(this.story.data.id)
