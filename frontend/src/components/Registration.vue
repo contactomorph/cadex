@@ -58,7 +58,6 @@
 
 <style>
 .registr_frame {
-  width: 700px;
   background-image: url("../assets/tile.jpg");
   background-repeat: repeat;
   font-family: Avenir, Helvetica, Arial, sans-serif;

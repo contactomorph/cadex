@@ -1,7 +1,7 @@
 <template>
 <div>
-  <div class="row">
-    <div class="col">
+  <div class="row justify-content-between">
+    <div class="col-6">
       <h2>Listes des joueurs</h2>
 
       <ul v-for="(p, key) in story.data.players" :key="key" class="list-group">
@@ -14,10 +14,10 @@
 
 
 
-    <div class="col">
+    <div class="col-4">
       <h2>Actions</h2>
       <div v-if="player && player.data.key === story.data.admin">
-        <button @click="closeStory" class="btn btn-primary">Terminer l'histoire</button>
+        <button @click="closeStory" class="btn btn-primary w-100">Terminer</button>
       </div>
       <div v-else class="row form-group">
         <div class="col-8">
@@ -33,7 +33,7 @@
   </div>
 
   <div class="row mt-5">
-    <div v-if="story && player" class="col-4">
+    <div v-if="story && player" class="col-12">
       <div class="alert alert-primary">
         <span v-if="story.data.completed">C'est terminé</span>
         <span v-else-if="player.data.myTurn">A moi de jouer !</span>
@@ -46,9 +46,9 @@
       <ex-cad :tokens="tokens"></ex-cad>
     </div>
   </div>
-  <div class="row">
+  <div class="row mt-5">
     <div class="col-4">
-      <p v-if="player.data.myTurn"><button class="btn btn-primary" @click="play">Jouer</button></p>
+      <p v-if="player && player.data.myTurn"><button class="btn btn-primary" @click="play">Jouer</button></p>
     </div>
   </div>
 </div>

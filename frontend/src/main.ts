@@ -5,6 +5,7 @@ import store from './store'
 
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue/dist/bootstrap-vue.css'
+import "bootstrap-icons/font/bootstrap-icons.css";
 
 import * as backend from './backend'
 

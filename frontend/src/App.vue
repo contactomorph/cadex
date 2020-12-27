@@ -1,13 +1,21 @@
 <template>
-<div id="app">
+<div id="app" class="container">
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <a class="navbar-brand" href="#">Cadex</a>
 
-    <ul class="navbar-nav">
-      <li class="nav-item"><router-link :to="{name: 'Home'}" class="nav-link">Home</router-link></li>
-      <li class="nav-item"><router-link :to="{name: 'Demo'}" class="nav-link">Component Demo</router-link></li>
-      <li class="nav-item"><router-link :to="{name: 'About'}" class="nav-link">About</router-link></li>
-    </ul>
+    <div>
+      <ul class="navbar-nav">
+        <li class="nav-item"><router-link :to="{name: 'Home'}" class="nav-link">
+            <i class="bi bi-house-fill"></i>&nbsp;<span class="collapseme">Home</span>
+        </router-link></li>
+        <li class="nav-item"><router-link :to="{name: 'Demo'}" class="nav-link">
+            <i class="bi bi-layers-fill"></i>&nbsp;<span class="collapseme">Component Demo</span>
+        </router-link></li>
+        <li class="nav-item"><router-link :to="{name: 'About'}" class="nav-link">
+            <i class="bi bi-info-square-fill"></i>&nbsp;<span class="collapseme">About</span>
+        </router-link></li>
+      </ul>
+    </div>
   </nav>
   <div class="container mt-3">
     <router-view/>
@@ -21,9 +29,16 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-#nav a {
+
+.navbar-nav {
+    flex-direction: row!important;
 }
 
-#nav a.router-link-exact-active {
+@media (max-width: 992px) {
+    .collapseme {
+        font-size: 0px;
+    }
 }
+
+
 </style>

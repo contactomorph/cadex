@@ -6,10 +6,10 @@
     </div>
   </div>
   <div class="row">
-    <div class="col-3 form-group">
+    <div class="col-10 form-group">
       <input v-model="adminName"  class="form-control" type="text" placeholder="votre nom">
     </div>
-    <div class="col-1">
+    <div class="col-2">
       <button @click="newStory" class="btn btn-primary">Créer</button>
     </div>
   </div>
