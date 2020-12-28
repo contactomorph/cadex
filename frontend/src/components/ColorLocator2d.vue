@@ -177,7 +177,8 @@ export default Vue.component('color-locator-2d', {
         case 'l': {
           const [h, s, l] = color.hsl()
           const sp = Math.round(100 * s)
-          sb = `linear-gradient(to top, #888, transparent),` +
+          const lp = Math.round(100 * l)
+          sb = `linear-gradient(to top, hsl(${h},0%,${lp}%), transparent),` +
             createLeftRightHueGradient(1, l)
           bb = `linear-gradient(to right, #000, hsl(${h},${sp}%,50%), #fff)`
           break

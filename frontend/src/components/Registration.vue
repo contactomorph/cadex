@@ -30,6 +30,7 @@
             <input
               type="button"
               class="registr_button"
+              :disabled="row.token.mode === 0 || row.token.mode === 3"
               :value="'\u{1F308}'"
               :style="row.buttonStyle"
               @click="openPicker(row)">
@@ -40,6 +41,7 @@
             <input
               type="button"
               class="registr_button"
+              :disabled="row.token.mode === 3"
               :value="row.token.mode === 0 ? '\u270e' : row.token.mode === 1 ? '\u2713' : '+'"
               @click="clickplus(row.token, row.index)"
               :style="row.buttonStyle">
