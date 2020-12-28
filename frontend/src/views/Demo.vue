@@ -58,14 +58,14 @@ const Demo = Vue.extend({
   data () {
     return {
       tokens: [
-        new ExCadToken("Eddy", "C'est joli", "tout ça"),
-        new ExCadToken("Viviane", "mais ça ne", "vaut pas"),
-        new ExCadToken("Aurélien", "la plupart", "des applications"),
-        new ExCadToken("Kiki", "qu'on trouve", "dans le commerce"),
-        new ExCadToken("Lapin", "même si", "beaucoup de gens"),
-        new ExCadToken("Rose", "pense que", "les amanites"),
-        new ExCadToken("George", "phalloïdes", "poussent dans"),
-        new ExCadToken("Fabrice", "de vaste prairies", "où les chevaux"),
+        new ExCadToken("Eddy", Chroma("#f00"), "C'est joli", "tout ça"),
+        new ExCadToken("Viviane", Chroma("#0f0"), "mais ça ne", "vaut pas"),
+        new ExCadToken("Aurélien", Chroma("#00f"), "la plupart", "des applications"),
+        new ExCadToken("Kiki", Chroma("#ff0"), "qu'on trouve", "dans le commerce"),
+        new ExCadToken("Lapin", Chroma("#f0f"), "même si", "beaucoup de gens"),
+        new ExCadToken("Rose", Chroma("#0ff"), "pense que", "les amanites"),
+        new ExCadToken("George", Chroma("#fff"), "phalloïdes", "poussent dans"),
+        new ExCadToken("Fabrice", Chroma("#000"), "de vaste prairies", "où les chevaux"),
       ],
       rtokens: [
         new RegistrationToken("Eddy", Chroma.rgb(255, 64, 0)),
@@ -79,7 +79,7 @@ const Demo = Vue.extend({
   methods: {
     addToken: function() {
       this.tokens.push(new ExCadToken(
-        "Yienyien", "ma tête", "ma queue"
+        "Yienyien", Chroma("888"), "ma tête", "ma queue"
       ))
     },
     getButtonText: function(num: number): string {

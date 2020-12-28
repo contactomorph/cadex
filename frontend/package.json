@@ -15,7 +15,7 @@
     "axios": "^0.20.0",
     "bootstrap": "^4.5.3",
     "bootstrap-icons": "^1.2.2",
-    "bootstrap-vue": "^2.20.1",
+    "bootstrap-vue": "^2.21.1",
     "cadexlib": "file:../commonlib",
     "chroma-js": "^2.1.0",
     "core-js": "^3.6.5",

@@ -57,9 +57,10 @@
 </template>
 
 <script lang="ts">
-  import Vue from 'vue'
+import Vue from 'vue'
 import { Story, registerPlayer, closeStory, Player, getUID, play, updatePlayer} from '../backend'
 import { ExCadMode, ExCadToken } from "../components/ExCad.vue"
+import Chroma from 'chroma-js'
 
 const StoryModule = Vue.extend({
   data() {
@@ -107,24 +108,23 @@ const StoryModule = Vue.extend({
       }
       for(const k of keys) {
         const p = story.data.players[k]
-
+        const color = Chroma(p.color || "#fff")
         let token: ExCadToken
 
         if (completed) {
           // the game is completed
-          token = new ExCadToken(p.name, p.head, p.tail, ExCadMode.Disclosed)
+          token = new ExCadToken(p.name, color, p.head, p.tail, ExCadMode.Disclosed)
         } else if (myKey === k) {
           // this row is mine
           const mode = isMyTurn ? ExCadMode.ReadyForInput : ExCadMode.Disclosed
-          token = new ExCadToken(p.name, player.data.head, player.data.tail, mode)
+          token = new ExCadToken(p.name, color, player.data.head, player.data.tail, mode)
         } else if(isMyTurn && k === lastPlayer) {
           // this row is just before me and i'm the current player
-          token = new ExCadToken(p.name, "", player.data.ptail, ExCadMode.HalfHidden)
+          token = new ExCadToken(p.name, color, "", player.data.ptail, ExCadMode.HalfHidden)
         } else {
           // this row is unrelated to me
-          token = new ExCadToken(p.name)
+          token = new ExCadToken(p.name, color)
         }
-        token.setColor(p.color)
         tokens.push(token)
       }
       return tokens

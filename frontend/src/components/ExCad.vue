@@ -91,26 +91,23 @@
 <script lang="ts">
 import Vue from 'vue'
 import Chroma from 'chroma-js'
+import PseudoGen from '../utils/PseudoGen'
 
 export enum ExCadMode { Hidden, HalfHidden, Disclosed, ReadyForInput }
 
 export class ExCadToken {
   readonly authorName: string
-  mainColor: Chroma.Color | null
+  mainColor: Chroma.Color
   mode: ExCadMode
   beginning: string
   ending: string
 
-  constructor(authorName: string, beginning?: string, ending?: string, mode?: ExCadMode) {
+  constructor(authorName: string, color: Chroma.Color, beginning?: string, ending?: string, mode?: ExCadMode) {
     this.authorName = authorName
     this.beginning = beginning ?? ""
     this.ending = ending ?? ""
     this.mode = mode ?? ExCadMode.Hidden
-    this.mainColor = null
-  }
-
-  setColor(color: string) {
-    this.mainColor = color ? Chroma(color) : null
+    this.mainColor = color
   }
 }
 
@@ -137,19 +134,9 @@ type ExCadRow = {
   readonly fuzzyStyle: TextColorStyle;
 }
 
-const minimalLightness = 0.2
 const generatedTextLength = 20
-const firstColorMinimalDifference= 80.0
-const distinctColorCount = 7
 const charCodeForA: number = 'a'.charCodeAt(0)
 const spaceProbability = 0.3
-const defaultAlpha = 0.9
-
-function generateNiceColor(): Chroma.Color {
-  const hue = 360 * Math.random()
-  const lightness = (1.0 - minimalLightness) * Math.random() + minimalLightness
-  return Chroma.hsl(hue, 1.0, lightness)
-}
 
 function generateColorSet(mainColor: Chroma.Color): ColorSet {
   const mainColorIsLight = mainColor.lch()[0] > 75.0
@@ -161,45 +148,16 @@ function generateColorSet(mainColor: Chroma.Color): ColorSet {
   return { mainColor, paleColor, palerColor, blackAndWhiteColor, contrastiveColor, }
 }
 
-function generateColorSets(count: number): ColorSet[] {
-  const colorSets = Array(count).fill(null) as ColorSet[]
-  let i = 0;
-  while (i < count) {
-    const mainColor = generateNiceColor().alpha(defaultAlpha)
-    let distinctEnough = true
-    for (let j = 1; j < distinctColorCount && j <= i && distinctEnough; ++j) {
-      const previousColor = colorSets[i - j].mainColor
-      distinctEnough =
-        Chroma.distance(previousColor, mainColor, 'lab') >=
-        firstColorMinimalDifference * (distinctColorCount + 1 - j) / distinctColorCount
-    }
-    if (!distinctEnough)
-      continue
-    colorSets[i] = generateColorSet(mainColor)
-    ++i
-  }
-  return colorSets
-}
-
-function generateText(): string {
+function generateText(gen: PseudoGen): string {
   let text = ""
   for(let i = 0; i < generatedTextLength; i++) {
-    const charCode = charCodeForA + Math.floor(26 * Math.random())
+    const charCode = charCodeForA + gen.nextInt(26)
     text += String.fromCharCode(charCode)
-    if (Math.random() < spaceProbability)
+    if (gen.nextBool(spaceProbability))
       text += ' '
   }
   return text
 }
-
-function generateTextSets(count: number): [string, string][] {
-  return Array(count).
-    fill(null).
-    map(() => [generateText(), generateText()])
-}
-
-const generatedSets: ColorSet[] = generateColorSets(100)
-const generatedTexts: [string, string][] = generateTextSets(100)
 
 export default Vue.component('ex-cad', {
   props: {
@@ -213,11 +171,11 @@ export default Vue.component('ex-cad', {
     rows: function(): ExCadRow[] {
       let index = 0
       const rows = [] as ExCadRow[]
-      for (const token of this.tokens) {
-        const set = (token.mainColor)? generateColorSet(token.mainColor): generatedSets[index]
+      for (const token of this.tokens as ExCadToken[]) {
+        const set = generateColorSet(token.mainColor)
         const shadowColor = set.contrastiveColor.hex('rgb')
         const style = {
-          backgroundColor: set.mainColor.hex('rgba'),
+          backgroundColor: set.mainColor.alpha(0.7).hex('rgba'),
           color: set.blackAndWhiteColor.hex('rgb'),
           textShadow: `-1px 0 ${shadowColor}, 0 1px ${shadowColor}, 1px 0 ${shadowColor}, 0 -1px ${shadowColor}`,
         }
@@ -227,8 +185,9 @@ export default Vue.component('ex-cad', {
           color: set.paleColor.hex('rgb'),
           textShadow: `-0.5px 0 ${palerColor}, 0 0.5px ${palerColor}, 0.5px 0 ${palerColor}, 0 -0.5px ${palerColor}`,
         }
-        const beginning = generatedTexts[index][0]
-        const ending = generatedTexts[index][1]
+        const gen = new PseudoGen(token.mainColor.num()).hash(index).hashText(token.authorName)
+        const beginning = generateText(gen)
+        const ending = generateText(gen)
         const row = { index, token, style, fuzzyStyle, beginning, ending }
         rows.push(row)
         ++index
