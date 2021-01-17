@@ -13,7 +13,7 @@ console.log("Loaded...")
  * Manage the story state, find the player, update status
  * Must be call in an atomic / transaction prevent bad data
  */
-function updateStoryState(story: StoryData|null): StoryData|null {
+function updateStoryState(story: StoryData|null, privateData: Array<PlayerPrivateData>): StoryData|null {
   if (!story) {
     return story
   }
@@ -25,6 +25,7 @@ function updateStoryState(story: StoryData|null): StoryData|null {
   }
 
   /* finalize the turn of the current player */
+  let tail = ''
   if (curr) {
     curr.myTurn = false
     if (!story.rounds) {
@@ -32,6 +33,9 @@ function updateStoryState(story: StoryData|null): StoryData|null {
     }
     story.rounds.push(curr.key)
     story.currentPlayer = ''
+
+    const currPlayer = privateData.find((p) => (p.key === curr.key))
+    tail = currPlayer.tail || ''
   }
 
   /* find a new available player */
@@ -39,7 +43,7 @@ function updateStoryState(story: StoryData|null): StoryData|null {
     if (!next.played) {
       story.players[key].myTurn = true
       story.currentPlayer = key
-      story.players[key].continuation = encode(story.id, (curr && curr.tail) ? curr.tail: '')
+      story.players[key].continuation = encode(story.id, tail)
       break
     }
   }
@@ -94,7 +98,7 @@ export const newStory = onCorsRequest(async (request, response) => {
     color: request.body.color,
   }, true)
 
-  await story.atomic(updateStoryState)
+  await story.atomicUpdateWithPrivateData(updateStoryState)
 
   response.json({
     admin: player.toJSON(),
@@ -133,7 +137,7 @@ export const newPlayer = onStoryRequest(false, async (story, request, response) 
     color: request.body.color,
   }, true)
 
-  await story.atomic(updateStoryState)
+  await story.atomicUpdateWithPrivateData(updateStoryState)
 
   response.status(200).json(player.toJSON())
 })
@@ -165,7 +169,7 @@ export const play = onStoryRequest(false, async (story, request, response) => {
     tail: request.body.tail,
   })
 
-  await story.atomic(updateStoryState)
+  await story.atomicUpdateWithPrivateData(updateStoryState)
 
   response.status(200).json({ message: 'ok' })
 })

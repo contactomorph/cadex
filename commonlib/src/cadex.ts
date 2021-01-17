@@ -243,6 +243,12 @@ class Story extends DBObject<StoryData> {
     return this.ref.child('players')
   }
 
+  public async atomicUpdateWithPrivateData(  handler: ((s: StoryData|null, d: Array<PlayerPrivateData>) => (StoryData|null))):Promise<void> {
+    const privateData = (await FirebaseSDK.DB.ref('players').child(this.data.id).once('value')).val()
+    const all = Object.values(privateData) as Array<PlayerPrivateData>
+    await this.atomic((story: StoryData|null) => { return handler(story, all) })
+  }
+
   public async finalize(): Promise<void> {
     /**
      * finalize function copies final data from private space
