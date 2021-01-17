@@ -1,7 +1,8 @@
 import * as functions from 'firebase-functions'
-import { Player, PlayerPrivate, PlayerPrivateData, Story, StoryData, initializeCadex} from 'cadexlib'
+import { Player, PlayerPrivate, PlayerPrivateData, Story, StoryData, initializeCadex, Contribution} from 'cadexlib'
 import * as firebase from 'firebase-admin'
 import { encode, decode, onCorsRequest, onStoryRequest } from './utils'
+import arrayShuffle = require("array-shuffle")
 
 firebase.initializeApp()
 initializeCadex(firebase.database())
@@ -14,13 +15,20 @@ console.log("Loaded...")
  * Must be call in an atomic / transaction prevent bad data
  */
 function updateStoryState(story: StoryData|null, privateData: Array<PlayerPrivateData>): StoryData|null {
-  if (!story) {
+  if (!story || !story.started) {
     return story
   }
 
-  const curr = story.players[story.currentPlayer]
+  const curr = story.players[story.order[story.round]]
 
-  if (story.currentPlayer !== '' && !curr.played) {
+  if (!curr.myTurn) {
+    curr.played = false
+    curr.myTurn = true
+    return story
+  }
+
+  /* Update but the current player does not play yet */
+  if (!curr.played) {
     return story
   }
 
@@ -32,23 +40,27 @@ function updateStoryState(story: StoryData|null, privateData: Array<PlayerPrivat
       story.rounds = new Array<string>()
     }
     story.rounds.push(curr.key)
-    story.currentPlayer = ''
-
     const currPlayer = privateData.find((p) => (p.key === curr.key))
     if (currPlayer) {
-      tail = currPlayer.tail || ''
+      const contrib = currPlayer.contributions[currPlayer.contributions.length - 1]
+      tail = contrib.tail || ''
     }
   }
 
-  /* find a new available player */
-  for (const [key, next] of Object.entries(story.players)) {
-    if (!next.played) {
-      story.players[key].myTurn = true
-      story.currentPlayer = key
-      story.players[key].continuation = encode(story.id, tail)
-      break
-    }
+  /* next round */
+  story.round += 1
+
+  /* Test if it is a new turn */
+  if (story.round >= story.order.length) {
+    story.turn += 1
+    story.round = 0
   }
+
+  /* Set the the new player */
+  const next = story.players[story.order[story.round]]
+  next.myTurn = true
+  next.played = false
+  next.continuation = encode(story.id, tail)
 
   return story
 }
@@ -105,6 +117,22 @@ export const newStory = onCorsRequest(async (request, response) => {
   response.json({
     admin: player.toJSON(),
     story: story.toJSON()
+  })
+})
+
+
+export const startStory = onStoryRequest(true, async (story, request, response) => {
+  const playerList = Object.values(story.data.players).map((p) => p.key)
+  const order = arrayShuffle(playerList)
+
+  await story.update({
+    started: true,
+    order
+  })
+
+  await story.atomicUpdateWithPrivateData(updateStoryState)
+  response.status(200).json({
+    message: "Story started"
   })
 })
 
@@ -165,10 +193,13 @@ export const play = onStoryRequest(false, async (story, request, response) => {
     return
   }
 
+  const contributions = player.privateData.contributions.concat([
+    new Contribution(request.body.head, request.body.tail)
+  ]);
+
   await player.update({
     played: true,
-    head: request.body.head,
-    tail: request.body.tail,
+    contributions,
   })
 
   await story.atomicUpdateWithPrivateData(updateStoryState)

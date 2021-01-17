@@ -27,9 +27,10 @@ interface Reference {
 
   /* eslint-disable */
   update(values: Object): Promise<any>;
-  /* eslint-enable */
 
   transaction ( transactionUpdate :  ( a :  any ) => any ,  onComplete ? :  ( a :  Error | null ,  b :  boolean ,  c :  DataSnapshot | null ) => any ,  applyLocally ? :  boolean ) : Promise < any >
+  /* eslint-enable */
+
 }
 
 interface Database {
@@ -150,15 +151,25 @@ class PlayerPublic extends DBObject<PlayerPublicData> {
   }
 }
 
+class Contribution {
+  head = ''
+  tail = ''
+
+  constructor(head: string, tail: string) {
+    this.head = head
+    this.tail = tail
+  }
+}
+
 class PlayerPrivateData extends PlayerPublicData {
   constructor() {
     super()
   }
   id = ''
-  head = ''
-  tail = ''
   ptail = ''
+  contributions = new Array<Contribution>()
 }
+
 /**
  * This is the private representation for a player
  * The player can modify whatever he wants in this space
@@ -217,11 +228,16 @@ type PlayerStoryData = U<PlayerPublicData & Partial<PlayerPrivateData>>
 
 class StoryData {
   id = ''
+  started = false
   completed = false
   admin = ''
   players = {} as Record<string, PlayerStoryData>
-  currentPlayer = ''
-  rounds = new Array<string>() // an entry for each player round with player key
+  order = new Array<string>()
+
+  /* A game is one or several TURN, composed by player round */
+  round = 0
+  turn = 0
+  rounds = new Array<string>() // the real (without skips) players rounds for the final result
 }
 
 /**
@@ -256,14 +272,13 @@ class Story extends DBObject<StoryData> {
      */
     const privateData = (await FirebaseSDK.DB.ref('players').child(this.data.id).once('value')).val()
 
-    const all = Object.values(privateData)
+    const src = Object.values(privateData) as Array<PlayerPrivateData>
     const tgt = {} as Record<string, PlayerStoryData>
 
     /* do not forget to remove private id of the players */
-    for (const player of all) {
-      const splayer = player as PlayerPrivateData
+    for (const player of src) {
       const tplayer = {} as PlayerStoryData
-      Object.assign(tplayer, splayer)
+      Object.assign(tplayer, player)
       delete tplayer['id']
       tgt[tplayer.key] = tplayer
     }
@@ -283,5 +298,6 @@ export {
   PlayerPublic as PlayerPublic,
   Story as Story,
   StoryData as StoryData,
+  Contribution as Contribution,
   initializeCadex
 }

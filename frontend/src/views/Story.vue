@@ -19,6 +19,10 @@
     <div class="col-4">
       <h2>Actions</h2>
       <div v-if="player && player.data.key === story.data.admin">
+        <button @click="startStory" class="btn btn-primary w-100">Démarrer</button>
+      </div>
+      <br/>
+      <div v-if="player && player.data.key === story.data.admin">
         <button @click="closeStory" class="btn btn-primary w-100">Terminer</button>
       </div>
       <div v-else class="row form-group">
@@ -58,7 +62,7 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import { Story, registerPlayer, closeStory, Player, getUID, play, updatePlayer} from '../backend'
+import { Story, registerPlayer, closeStory, startStory, Player, getUID, play, updatePlayer} from '../backend'
 import { ExCadMode, ExCadToken } from "../components/ExCad.vue"
 import Chroma from 'chroma-js'
 
@@ -100,12 +104,16 @@ const StoryModule = Vue.extend({
       const tokens = [] as ExCadToken[]
       const completed = story.data.completed
       const isMyTurn: boolean = player.data.myTurn
+
       const myKey: string = player.data.key
       let keys = story.data.rounds ?? []
       const lastPlayer: string = keys[keys.length-1]
-      if (story.data.currentPlayer) {
-        keys = keys.concat([story.data.currentPlayer])
+
+      if (story.data.order.length > 0) {
+        keys = keys.concat(story.data.order[story.data.round])
+        /* if not, the game is not started */
       }
+
       for(const k of keys) {
         const p = story.data.players[k]
         const color = Chroma(p.color || "#fff")
@@ -135,7 +143,7 @@ const StoryModule = Vue.extend({
       if (!this.player) {
         return;
       }
-      
+
       const myToken = this.tokens[this.tokens.length - 1]
       await play(this.story.data.id, myToken.beginning, myToken.ending)
 
@@ -158,10 +166,13 @@ const StoryModule = Vue.extend({
       }
     },
     async setColor(color: string) {
-      updatePlayer(this.story.data.id, {color})
+      await updatePlayer(this.story.data.id, {color})
     },
     async closeStory (): Promise<void> {
-      closeStory(this.story.data.id)
+      await closeStory(this.story.data.id)
+    },
+    async startStory (): Promise<void> {
+      await startStory(this.story.data.id)
     }
 
   }

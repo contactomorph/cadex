@@ -122,6 +122,15 @@ async function registerPlayer(player: PlayerPrivate) {
   return player
 }
 
+async function startStory(storyId: string) {
+  const uid = await getUID()
+  await jsonPOST('startStory', {
+    uid: uid,
+    storyId, storyId
+  })
+  return true
+}
+
 async function closeStory(storyId: string) {
   const uid = await getUID()
   await jsonPOST('closeStory', {
@@ -168,6 +177,7 @@ export {
   Story as Story,
   PlayerPrivate as Player,
   newStory,
+  startStory,
   closeStory,
   play,
   registerPlayer,

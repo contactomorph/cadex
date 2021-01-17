@@ -2,8 +2,12 @@
   "name": "functions",
   "watch": {
     "build": {
-      "patterns": ["src"],
-      "extensions": ["ts"]
+      "patterns": [
+        "src"
+      ],
+      "extensions": [
+        "ts"
+      ]
     }
   },
   "scripts": {
@@ -23,6 +27,7 @@
   "dependencies": {
     "@types/cors": "^2.8.7",
     "@types/uuid": "^8.3.0",
+    "array-shuffle": "^2.0.0",
     "cadexlib": "file:../commonlib",
     "cors": "^2.8.5",
     "firebase-admin": "^8.10.0",
