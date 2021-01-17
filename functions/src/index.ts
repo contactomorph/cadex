@@ -1,5 +1,5 @@
 import * as functions from 'firebase-functions'
-import { Player, PlayerPrivate, Story, StoryData, initializeCadex} from 'cadexlib'
+import { Player, PlayerPrivate, PlayerPrivateData, Story, StoryData, initializeCadex} from 'cadexlib'
 import * as firebase from 'firebase-admin'
 import { encode, decode, onCorsRequest, onStoryRequest } from './utils'
 
@@ -35,7 +35,9 @@ function updateStoryState(story: StoryData|null, privateData: Array<PlayerPrivat
     story.currentPlayer = ''
 
     const currPlayer = privateData.find((p) => (p.key === curr.key))
-    tail = currPlayer.tail || ''
+    if (currPlayer) {
+      tail = currPlayer.tail || ''
+    }
   }
 
   /* find a new available player */

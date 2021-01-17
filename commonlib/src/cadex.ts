@@ -279,6 +279,7 @@ class Story extends DBObject<StoryData> {
 export {
   Player as Player,
   PlayerPrivate as PlayerPrivate,
+  PlayerPrivateData as PlayerPrivateData,
   PlayerPublic as PlayerPublic,
   Story as Story,
   StoryData as StoryData,
