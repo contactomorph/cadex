@@ -61,19 +61,22 @@ class DBObject<T> {
     this.data = data
   }
 
-  protected updateData(data: Partial<T>): void {
+  protected updateData(data: Partial<T>): Partial<T> {
     const src = data as Record<string, unknown>
     const tgt = this.data as Record<string, unknown>
+    const partialTgt = {} as Record<string, unknown>
 
     for (const key of Object.keys(tgt)) {
       if (src[key] !== undefined && src[key] !== null) {
         tgt[key] = src[key]
+        partialTgt[key] = src[key]
       }
     }
+    return partialTgt as Partial<T>
   }
 
   public async atomic(handler: (d: T|null) => T|null) {
-    this.ref.transaction(handler)
+    await this.ref.transaction(handler)
   }
 
   public async load() {
@@ -97,11 +100,11 @@ class DBObject<T> {
   }
 
   public async update(data: Partial<T>, all?: boolean) {
-    this.updateData(data)
+    const partialUpdate = this.updateData(data)
     if (all) {
       await this.save()
     } else {
-      await this.ref.update(data)
+      await this.ref.update(partialUpdate)
     }
   }
 
