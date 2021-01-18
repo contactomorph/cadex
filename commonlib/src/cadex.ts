@@ -129,13 +129,18 @@ class DBObject<T> {
 }
 
 class PlayerPublicData {
+  /* readonly */
   name = ''
-  played = false
-  myTurn = false
   key = ''
   sid = ''
-  continuation = ''
+
+  /* could be set */
   color = ''
+
+  /* update when it is the player round */
+  myTurn = false
+  played = false
+  continuation = ''
 }
 /**
  * This is the public representation for a player
@@ -166,8 +171,11 @@ class PlayerPrivateData extends PlayerPublicData {
     super()
   }
   id = ''
-  ptail = ''
+  /* store each contribution */
   contributions = new Array<Contribution>()
+
+  /* ptail is updated at each player round */
+  ptail = ''
 }
 
 /**
@@ -231,13 +239,16 @@ class StoryData {
   started = false
   completed = false
   admin = ''
+  /* The set of players */
   players = {} as Record<string, PlayerStoryData>
+  /* The player order for a turn */
   order = new Array<string>()
 
   /* A game is one or several TURN, composed by player round */
   round = 0
   turn = 0
-  rounds = new Array<string>() // the real (without skips) players rounds for the final result
+  // the real (recorded) players rounds for the final result
+  rounds = new Array<string>()
 }
 
 /**
@@ -259,7 +270,12 @@ class Story extends DBObject<StoryData> {
     return this.ref.child('players')
   }
 
-  public async atomicUpdateWithPrivateData(  handler: ((s: StoryData|null, d: Array<PlayerPrivateData>) => (StoryData|null))):Promise<void> {
+  public async atomicUpdateWithPrivateData(
+    handler: ((s: StoryData|null, d: Array<PlayerPrivateData>) => (StoryData|null))
+  ):Promise<void> {
+    /*
+     * Run an atomic story update and provide all private player data to the updater
+     */
     const privateData = (await FirebaseSDK.DB.ref('players').child(this.data.id).once('value')).val()
     const all = Object.values(privateData) as Array<PlayerPrivateData>
     await this.atomic((story: StoryData|null) => { return handler(story, all) })
