@@ -2,7 +2,7 @@ import firebase from 'firebase/app'
 import 'firebase/database'
 import 'firebase/auth'
 import axios from 'axios'
-import { PlayerPrivate, Story, initializeCadex } from 'cadexlib'
+import { Contribution, PlayerPrivate, Story, initializeCadex } from 'cadexlib'
 
 const isDev = window.location.host.startsWith('localhost')
 const databaseURL = (isDev) ? "http://localhost:9000/?ns=cadex-a057e": "https://cadex-a057e.firebaseio.com"
@@ -183,4 +183,5 @@ export {
   registerPlayer,
   getUID,
   updatePlayer,
+  Contribution,
 }
