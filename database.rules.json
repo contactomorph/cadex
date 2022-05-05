@@ -1,15 +1,10 @@
 {
   /* Visit https://firebase.google.com/docs/database/security to learn more about security rules. */
   "rules": {
-    "players": {
-      "$storyId": {
-        "$userId": {
-          ".read": "$userId == auth.uid && root.child('stories').child($storyId).exists()",
-          ".write": false
-        }
-      }
-    },
-    "stories": {
+ezlfjzelf
+    
+    zkejflzkef
+    kjklze
       ".read": true,
       ".write": false
     }
